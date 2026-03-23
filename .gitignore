@@ -2,3 +2,5 @@ data/FACED/*
 data/thu ep/*
 
 models/*
+
+__pycache__
