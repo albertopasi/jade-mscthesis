@@ -297,14 +297,13 @@ def train_official_mode(
         # W&B per-epoch logging
         if wandb.run is not None:
             wandb.log({
-                "epoch":        epoch + 1,
-                "train_loss":   avg_loss,
-                "train_acc":    train_acc,
-                "val_acc":      val_acc,
-                "val_bal_acc":  metrics["balanced_acc"],
-                "val_auroc":    metrics["auroc"],
-                "val_f1":       metrics["f1_weighted"],
-                "lr":           lr,
+                "train/loss":    avg_loss,
+                "train/acc":     train_acc,
+                "val/acc":       val_acc,
+                "val/bal_acc":   metrics["balanced_acc"],
+                "val/auroc":     metrics["auroc"],
+                "val/f1":        metrics["f1_weighted"],
+                "train/lr":      lr,
             }, step=epoch + 1)
 
         # Early stopping
@@ -427,10 +426,10 @@ def run_fold_official(
 
     if USE_WANDB:
         wandb.log({
-            "best_val_acc": result.get("val_acc"),
-            "best_val_bal_acc": result.get("val_bal_acc"),
-            "best_val_auroc": result.get("val_auroc"),
-            "best_val_f1": result.get("val_f1"),
+            "best/val_acc":     result.get("val_acc"),
+            "best/val_bal_acc": result.get("val_bal_acc"),
+            "best/val_auroc":   result.get("val_auroc"),
+            "best/val_f1":      result.get("val_f1"),
         })
         wandb.finish()
 
