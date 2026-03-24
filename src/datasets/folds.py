@@ -74,10 +74,9 @@ def get_stimulus_generalization_split(
     Returns:
         (train_stimulus_indices, test_stimulus_indices) as sets of 0-indexed ints.
     """
-    # Both datasets share the same label structure; use THU-EP's builder
-    from src.datasets.thu_ep_dataset import _build_stimulus_label_map
+    from src.datasets.base import build_stimulus_label_map
 
-    label_map = _build_stimulus_label_map(task_mode)
+    label_map = build_stimulus_label_map(task_mode)
     rng = np.random.RandomState(seed)
 
     train_stim: set[int] = set()

@@ -3,7 +3,7 @@ train_lp.py — Main execution script for the Linear Probing (LP) run.
 
 Supports two modes:
   - Official mode (--official): frozen REVE encoder runs live each batch,
-    trainable cls_query_token + linear head. Faithful to reve_official.
+    trainable cls_query_token + linear head.
   - Fast mode (--fast): pre-computed REVE embeddings + standalone linear head.
     Quick iteration, not a faithful reproduction.
 
@@ -129,7 +129,7 @@ def build_raw_dataset(
         )
 
 
-# ── Patience monitor (matching official) ─────────────────────────────────────
+# ── Patience monitor ─────────────────────────────────────
 
 class PatienceMonitor:
     """Monitor validation accuracy with early stopping."""
@@ -149,10 +149,10 @@ class PatienceMonitor:
             return self.counter >= self.patience
 
 
-# ── Exponential warmup (matching official) ────────────────────────────────────
+# ── Exponential warmup ────────────────────────────────────
 
 def _get_exponential_warmup_lambda(total_steps: int):
-    """Official REVE exponential warmup schedule."""
+    """Exponential warmup schedule."""
     def fn(step: int) -> float:
         if step >= total_steps or total_steps == 0:
             return 1.0
@@ -170,7 +170,7 @@ def train_official_mode(
     device: str,
 ) -> dict:
     """
-    Manual training loop matching the official REVE linear probing procedure.
+    Manual training loop matching REVE linear probing procedure.
 
     Uses: StableAdamW, exponential warmup, mixup, AMP, gradient clipping.
     """
@@ -771,16 +771,17 @@ def main() -> None:
             print_fold_summary(cfg, fold_results, gen_seed=gen_seed)
 
         if gen_seed is not None:
-            accs   = [r["val_acc"]   for r in fold_results if r.get("val_acc")   is not None]
-            aurocs = [r.get("val_auroc", r.get("val_auc_pr")) for r in fold_results
-                      if r.get("val_auroc") is not None or r.get("val_auc_pr") is not None]
-            f1s    = [r.get("val_f1", r.get("val_f1")) for r in fold_results if r.get("val_f1") is not None]
+            accs     = [r["val_acc"]     for r in fold_results if r.get("val_acc")     is not None]
+            bal_accs = [r["val_bal_acc"] for r in fold_results if r.get("val_bal_acc") is not None]
+            aurocs   = [r["val_auroc"]   for r in fold_results if r.get("val_auroc")   is not None]
+            f1s      = [r["val_f1"]      for r in fold_results if r.get("val_f1")      is not None]
             seed_summaries.append({
-                "seed":       gen_seed,
-                "mean_acc":   round(statistics.mean(accs), 4) if accs else None,
-                "mean_auroc": round(statistics.mean(aurocs), 4) if aurocs else None,
-                "mean_f1":    round(statistics.mean(f1s), 4) if f1s else None,
-                "folds":      fold_results,
+                "seed":         gen_seed,
+                "mean_acc":     round(statistics.mean(accs),     4) if accs     else None,
+                "mean_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
+                "mean_auroc":   round(statistics.mean(aurocs),   4) if aurocs   else None,
+                "mean_f1":      round(statistics.mean(f1s),      4) if f1s      else None,
+                "folds":        fold_results,
             })
 
     # Cleanup

@@ -1,7 +1,6 @@
 """
 stable_adamw.py — Simplified StableAdamW optimizer for linear probing.
 
-Ported from reve_official/src/utils/stable_adamw.py.
 Stripped of DDP, gradient_release, and norm-return features.
 Keeps the core algorithm: debiased betas, RMS-stabilized learning rates,
 decoupled weight decay.
@@ -22,7 +21,7 @@ def _debias_beta(beta: float, step: int) -> float:
 
 
 class StableAdamW(Optimizer):
-    """StableAdamW: AdamW–Adafactor hybrid with RMS-stabilized learning rates.
+    """StableAdamW: AdamW-Adafactor hybrid with RMS-stabilized learning rates.
 
     Args:
         params: Iterable of parameters to optimize
@@ -30,7 +29,7 @@ class StableAdamW(Optimizer):
         betas: Coefficients for gradient and squared gradient moving averages
                (default: (0.92, 0.999))
         weight_decay: Decoupled weight decay coefficient (default: 0.01)
-        eps: Numerical stability term (default: 1e-6)
+        eps: Numerical stability term (default: 1e-9)
     """
 
     def __init__(
@@ -39,7 +38,7 @@ class StableAdamW(Optimizer):
         lr: float = 5e-3,
         betas: tuple[float, float] = (0.92, 0.999),
         weight_decay: float = 0.01,
-        eps: float = 1e-6,
+        eps: float = 1e-9,
     ):
         if not 0.0 <= lr:
             raise ValueError(f"Invalid learning rate: {lr}")

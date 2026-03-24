@@ -78,7 +78,7 @@ class LPConfig:
     task_mode: str = "binary"
     fold: int | None = None
     generalization: bool = False
-    gen_seeds: list[int] = field(default_factory=lambda: [123])
+    gen_seeds: list[int] = field(default_factory=lambda: [123, 456, 789])
 
     # Window
     window_size: int = 2000    # 10 s at 200 Hz
@@ -88,14 +88,14 @@ class LPConfig:
     pooling: str = "no"        # "no", "last", "last_avg"
 
     # Training
-    max_epochs: int = 20
+    max_epochs: int = 50
     batch_size: int = 64
     lr: float = 5e-3
     dropout: float = 0.05
     weight_decay: float = 0.01
     warmup_epochs: int = 3
-    scheduler_patience: int = 6
-    early_stop_patience: int = 10
+    scheduler_patience: int = 5
+    early_stop_patience: int = 15
     grad_clip: float = 100.0
 
     # Regularization / precision

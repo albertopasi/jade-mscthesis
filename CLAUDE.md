@@ -1,6 +1,9 @@
 # CLAUDE.md — jade-mscthesis
 
 MSc thesis project: reproduce and extend REVE linear probing downstream task on FACED and THU-EP EEG datasets.
+Future work will include (hence it is important to keep things modular and easily reusable/modifiable): 
+- Fine tuning REVE with LoRA, keeping linear head as in linear probing,
+- Enhance the fine tuning with lora using Supervised Contrastive Learning, attaching a projection head. Training will be joint: Total Loss will be  weighted sum of Cross Entropy Loss and SupCon Loss.
 
 ## Always use `uv run python` to run anything (not plain `python`)
 

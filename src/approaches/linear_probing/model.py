@@ -3,8 +3,7 @@ model.py — REVE models for Linear Probing.
 
 Provides:
   - RMSNorm: Root Mean Square Layer Normalization.
-  - ReveClassifierLP: Official-faithful LP module with frozen encoder +
-    trainable cls_query_token + trainable linear head.
+  - ReveClassifierLP: LP module with frozen encoder + trainable cls_query_token + trainable linear head.
   - EmbeddingExtractor: utility for pre-computing fixed REVE embeddings (fast mode).
   - LinearProber: Lightning Module training a linear head on pre-computed embeddings.
 """
@@ -99,7 +98,7 @@ def compute_n_patches(window_size: int, patch_size: int = 200, overlap: int = 20
     return (window_size - patch_size) // step + 1
 
 
-# ── ReveClassifierLP (Official-faithful mode) ────────────────────────────────
+# ── ReveClassifierLP ────────────────────────────────
 
 class ReveClassifierLP(nn.Module):
     """
@@ -138,7 +137,7 @@ class ReveClassifierLP(nn.Module):
         # Register electrode positions as buffer (not a parameter)
         self.register_buffer("pos_tensor", pos_tensor)  # (n_channels, 3)
 
-        # Trainable query token — fresh random init matching official
+        # Trainable query token — fresh random init
         self.cls_query_token = nn.Parameter(torch.randn(1, 1, self.embed_dim))
 
         self.dropout = nn.Dropout(dropout)
@@ -274,13 +273,15 @@ def evaluate_model(
         "auc_pr": 0.0,
     }
 
-    if binary:
-        try:
-            probs_softmax = torch.softmax(torch.from_numpy(pr_probs), dim=-1).numpy()
+    try:
+        probs_softmax = torch.softmax(torch.from_numpy(pr_probs), dim=-1).numpy()
+        if binary:
             metrics["auroc"] = roc_auc_score(gt, probs_softmax[:, 1])
             metrics["auc_pr"] = average_precision_score(gt, probs_softmax[:, 1])
-        except ValueError:
-            pass  # single class in batch
+        else:
+            metrics["auroc"] = roc_auc_score(gt, probs_softmax, multi_class="ovr", average="macro")
+    except ValueError:
+        pass  # too few classes in fold (e.g. single-class val split)
 
     return metrics
 
