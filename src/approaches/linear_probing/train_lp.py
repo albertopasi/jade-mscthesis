@@ -294,6 +294,19 @@ def train_official_mode(
             f"{lr:>10.2e}  ({eta})"
         )
 
+        # W&B per-epoch logging
+        if wandb.run is not None:
+            wandb.log({
+                "epoch":        epoch + 1,
+                "train_loss":   avg_loss,
+                "train_acc":    train_acc,
+                "val_acc":      val_acc,
+                "val_bal_acc":  metrics["balanced_acc"],
+                "val_auroc":    metrics["auroc"],
+                "val_f1":       metrics["f1_weighted"],
+                "lr":           lr,
+            }, step=epoch + 1)
+
         # Early stopping
         if patience_monitor(val_acc):
             print(f"Early stopping at epoch {epoch + 1} (patience={cfg.early_stop_patience})")
