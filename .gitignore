@@ -6,3 +6,15 @@ reve_official
 
 __pycache__
 .venv
+.env
+.vscode
+
+output
+outputs/lp_checkpoints/lp*
+outputs/lora_checkpoints/lora*
+.pytest_cache
+
+debug_output
+wandb/
+runs_srt/
+delftblue
