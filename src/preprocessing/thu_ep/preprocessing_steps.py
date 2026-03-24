@@ -9,7 +9,7 @@ These functions operate on THU-EP data with shape transformations:
 """
 
 import numpy as np
-import mne
+from scipy import signal as scipy_signal
 from typing import Tuple, List
 
 
@@ -66,35 +66,30 @@ def remove_reference_channels(data: np.ndarray, channels_to_remove_indices: List
 def downsample_stimuli(data: np.ndarray, original_sfreq: float, target_sfreq: float,
                       verbose: bool = False) -> np.ndarray:
     """
-    Downsample all stimuli from original to target sampling rate using MNE.
-    
-    Uses mne.filter.resample with polyphase FIR filtering on the last axis (samples).
-    
+    Downsample all stimuli from original to target sampling rate using scipy FFT resampling.
+
+    Matching reve_official/preprocessing/preprocessing_faced.py which uses
+    scipy.signal.resample (FFT-based) on axis=2.
+
     Args:
         data: (n_stimuli, n_channels, n_samples)
         original_sfreq: Original sampling frequency in Hz
         target_sfreq: Target sampling frequency in Hz
         verbose: Whether to print progress
-        
+
     Returns:
         Resampled data with shape (n_stimuli, n_channels, n_samples_new)
     """
-    
     n_samples_orig = data.shape[-1]
-    
-    # Calculate down factor for downsampling
-    # Example: 250 Hz / 200 Hz = 1.25 -> down=1.25
-    down = original_sfreq / target_sfreq
-    
-    # Resample along last axis (samples) using polyphase FIR method
-    # Polyphase method provides better frequency characteristics than FFT for EEG
-    result = mne.filter.resample(data, down=down, method='polyphase')
-    
+    n_samples_new = round(n_samples_orig * target_sfreq / original_sfreq)
+
+    result = scipy_signal.resample(data, n_samples_new, axis=2)
+
     if verbose:
         print(f"  Downsampled: {original_sfreq} Hz -> {target_sfreq} Hz "
               f"({n_samples_orig} -> {result.shape[-1]} samples) "
-              f"using MNE polyphase resampling (down={down:.2f})")
-    
+              f"using scipy.signal.resample")
+
     return result
 
 

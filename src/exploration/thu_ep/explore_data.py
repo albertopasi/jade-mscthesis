@@ -7,8 +7,8 @@ This script loads and inspects:
 - Ratings (ratings.mat)
 
 Usage:
-    python -m src.thu_ep.exploration.explore_data
-    uv run python -m src.thu_ep.exploration.explore_data
+    python -m src.exploration.thu_ep.explore_data
+    uv run python -m src.exploration.thu_ep.explore_data
 """
 
 from pathlib import Path
@@ -17,7 +17,7 @@ import numpy as np
 import h5py
 import scipy.io as sio
 
-from ..config import get_config
+from src.preprocessing.thu_ep.config import get_config
 
 
 # Load configuration

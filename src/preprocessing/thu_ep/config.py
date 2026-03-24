@@ -13,7 +13,7 @@ import yaml
 
 def get_config_path() -> Path:
     """Get the path to the thu_ep.yml config file."""
-    return Path(__file__).parent.parent.parent / "configs" / "thu_ep.yml"
+    return Path(__file__).parent.parent.parent.parent / "configs" / "thu_ep.yml"
 
 
 def load_config() -> Dict[str, Any]:

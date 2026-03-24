@@ -5,7 +5,7 @@ Provides:
   - EmbeddedDataset: thin wrapper over pre-computed REVE embedding tensors.
 
 Shared dataset utilities (THUEPWindowDataset, label maps, excluded subjects/stimuli)
-live in src.thu_ep.dataset.
+live in src.datasets.thu_ep_dataset.
 """
 
 from __future__ import annotations

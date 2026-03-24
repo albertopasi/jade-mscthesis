@@ -1,11 +1,14 @@
 """
-folds.py — Shared cross-subject KFold split utilities for THU-EP.
+folds.py — Shared cross-subject KFold split utilities.
+
+Works for both THU-EP and FACED datasets (same 28-stimulus, 9-emotion structure).
 
 Provides:
   - N_FOLDS: canonical number of folds (10).
   - FOLD_RANDOM_STATE: fixed random seed for reproducible splits (42).
-  - get_all_subjects(): list of valid subject IDs (1-80, excluding corrupted).
+  - get_all_subjects(dataset): list of valid subject IDs for a dataset.
   - get_kfold_splits(): 10-fold cross-subject KFold split on a subject list.
+  - get_stimulus_generalization_split(): balanced 2/3-train, 1/3-test stimulus split.
 """
 
 from __future__ import annotations
@@ -13,7 +16,8 @@ from __future__ import annotations
 import numpy as np
 from sklearn.model_selection import KFold
 
-from src.thu_ep.dataset import EXCLUDED_SUBJECTS
+from src.datasets.thu_ep_dataset import EXCLUDED_SUBJECTS as THU_EP_EXCLUDED
+from src.datasets.faced_dataset import EXCLUDED_SUBJECTS as FACED_EXCLUDED
 
 
 N_FOLDS = 10
@@ -21,7 +25,7 @@ FOLD_RANDOM_STATE = 42
 STIMULUS_SPLIT_SEED = 123
 
 # Emotion groups: (stimulus index range, 9-class label).
-# Used by get_stimulus_generalization_split to ensure balanced held-out stimuli.
+# Shared between THU-EP and FACED (identical 28-stimulus, 9-emotion structure).
 _EMOTION_GROUPS: list[tuple[range, int]] = [
     (range(0, 3),   0),   # Anger
     (range(3, 6),   1),   # Disgust
@@ -35,9 +39,18 @@ _EMOTION_GROUPS: list[tuple[range, int]] = [
 ]
 
 
-def get_all_subjects() -> list[int]:
-    """Return list of valid subject IDs (1-80, excluding corrupted subjects)."""
-    return [i for i in range(1, 81) if i not in EXCLUDED_SUBJECTS]
+def get_all_subjects(dataset: str = "thu-ep") -> list[int]:
+    """Return list of valid subject IDs for the specified dataset.
+
+    Args:
+        dataset: 'thu-ep' (IDs 1-80, 1-indexed) or 'faced' (IDs 0-122, 0-indexed).
+    """
+    if dataset == "thu-ep":
+        return [i for i in range(1, 81) if i not in THU_EP_EXCLUDED]
+    elif dataset == "faced":
+        return [i for i in range(123) if i not in FACED_EXCLUDED]
+    else:
+        raise ValueError(f"Unknown dataset: {dataset}")
 
 
 def get_stimulus_generalization_split(
@@ -52,6 +65,8 @@ def get_stimulus_generalization_split(
 
     In binary mode, Neutral stimuli are excluded from both sets (label = None).
 
+    Works for both THU-EP and FACED (same 28-stimulus, 9-emotion structure).
+
     Args:
         task_mode: 'binary' or '9-class'.
         seed:      Random seed for the per-group shuffle.
@@ -59,7 +74,8 @@ def get_stimulus_generalization_split(
     Returns:
         (train_stimulus_indices, test_stimulus_indices) as sets of 0-indexed ints.
     """
-    from src.thu_ep.dataset import _build_stimulus_label_map
+    # Both datasets share the same label structure; use THU-EP's builder
+    from src.datasets.thu_ep_dataset import _build_stimulus_label_map
 
     label_map = _build_stimulus_label_map(task_mode)
     rng = np.random.RandomState(seed)

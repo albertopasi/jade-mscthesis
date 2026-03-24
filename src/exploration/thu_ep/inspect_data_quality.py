@@ -11,13 +11,13 @@ Checks for:
 
 Usage:
     # Inspect specific subject/stimulus
-    uv run python -m src.thu_ep.exploration.inspect_data_quality --subject 1 --stimulus 0
+    uv run python -m src.exploration.thu_ep.inspect_data_quality --subject 1 --stimulus 0
     
     # Scan all subjects for issues
-    uv run python -m src.thu_ep.exploration.inspect_data_quality --scan-all
+    uv run python -m src.exploration.thu_ep.inspect_data_quality --scan-all
     
     # Detailed report for one subject (all stimuli)
-    uv run python -m src.thu_ep.exploration.inspect_data_quality --subject 33 --all-stimuli
+    uv run python -m src.exploration.thu_ep.inspect_data_quality --subject 33 --all-stimuli
 """
 
 from pathlib import Path
@@ -28,7 +28,7 @@ import sys
 import numpy as np
 import h5py
 
-from ..config import get_config
+from src.preprocessing.thu_ep.config import get_config
 
 # Load configuration
 _cfg = get_config()
@@ -627,10 +627,10 @@ def main():
     else:
         parser.print_help()
         print("\nExamples:")
-        print("  uv run python -m src.thu_ep.exploration.inspect_data_quality -s 1 -st 0")
-        print("  uv run python -m src.thu_ep.exploration.inspect_data_quality -s 33 --all-stimuli")
-        print("  uv run python -m src.thu_ep.exploration.inspect_data_quality --scan-all")
-        print("  uv run python -m src.thu_ep.exploration.inspect_data_quality --scan-artifacts")
+        print("  uv run python -m src.exploration.thu_ep.inspect_data_quality -s 1 -st 0")
+        print("  uv run python -m src.exploration.thu_ep.inspect_data_quality -s 33 --all-stimuli")
+        print("  uv run python -m src.exploration.thu_ep.inspect_data_quality --scan-all")
+        print("  uv run python -m src.exploration.thu_ep.inspect_data_quality --scan-artifacts")
 
 
 if __name__ == "__main__":

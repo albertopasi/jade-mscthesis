@@ -17,7 +17,7 @@ paths:
   raw_data_dir: "data/thu ep/EEG data"
   ratings_dir: "data/thu ep/Ratings"
   others_dir: "data/thu ep/Others"
-  preprocessed_output_dir: "data/thu ep/preprocessed"
+  preprocessed_output_dir: "data/thu ep/preprocessed_v2"
 
 # =============================================================================
 # Channel Configuration

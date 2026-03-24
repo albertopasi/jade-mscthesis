@@ -98,8 +98,8 @@ class THUEPWindowDataset(Dataset):
     --------------------
     Each stimulus has shape (30, 6000): 30 channels x 6000 timepoints (30 s at 200 Hz).
 
-    With window_size=1600 (8 s) and stride=800 (4 s):
-        n_windows = floor((6000 - 1600) / 800) + 1 = 6 windows per stimulus
+    With window_size=2000 (10 s) and stride=2000 (non-overlapping):
+        n_windows = floor((6000 - 2000) / 2000) + 1 = 3 windows per stimulus
 
     The flat index `self.index` stores (subject_id, stimulus_idx, window_start)
     tuples so that DataLoader.shuffle=True works out of the box.
@@ -108,8 +108,9 @@ class THUEPWindowDataset(Dataset):
         subject_ids:  List of 1-indexed subject IDs to include.
         task_mode:    'binary' or '9-class'.
         data_root:    Path to the directory containing sub_XX.npy files.
-        window_size:  Number of timepoints per window (default 1600 = 8 s).
-        stride:       Stride between consecutive windows (default 800 = 4 s).
+        window_size:  Number of timepoints per window (default 2000 = 10 s).
+        stride:       Stride between consecutive windows (default 2000 = non-overlapping).
+        scale_factor: Divide raw EEG by this (default 1000.0, matching official).
     """
 
     def __init__(
@@ -117,8 +118,9 @@ class THUEPWindowDataset(Dataset):
         subject_ids: List[int],
         task_mode: str,
         data_root: Path,
-        window_size: int = 1600,
-        stride: int = 800,
+        window_size: int = 2000,
+        stride: int = 2000,
+        scale_factor: float = 1000.0,
         stimulus_filter: Optional[set[int]] = None,
     ) -> None:
         super().__init__()
@@ -131,6 +133,7 @@ class THUEPWindowDataset(Dataset):
         self.data_root = Path(data_root)
         self.window_size = window_size
         self.stride = stride
+        self.scale_factor = scale_factor
         self.stimulus_filter = stimulus_filter
 
         # Build stimulus → label lookup for this task mode.
@@ -197,7 +200,7 @@ class THUEPWindowDataset(Dataset):
         # data_cache[sid] shape: (28, 30, 6000)
         window = self.data_cache[subject_id][stim_idx, :, window_start : window_start + self.window_size]
 
-        eeg_tensor = torch.from_numpy(window.astype(np.float32))  # (30, window_size)
+        eeg_tensor = torch.from_numpy(window.astype(np.float32)) / self.scale_factor
         label = self._label_map[stim_idx]
 
         return eeg_tensor, label

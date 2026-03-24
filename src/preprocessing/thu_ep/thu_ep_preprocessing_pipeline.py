@@ -10,7 +10,7 @@ Amplitude scaling (µV → REVE input range) is handled at load time via
 THUEPWindowDataset.scale_factor (default 1000.0), matching the FACED pipeline.
 
 Input:  data/thu ep/EEG data/sub_X.mat
-Output: data/thu ep/preprocessed/sub_XX.npy (28, 30, 6000)
+Output: data/thu ep/preprocessed_v2/sub_XX.npy (28, 30, 6000) in raw µV
 """
 
 import numpy as np
@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import re
 
-from ..config import THUEPConfig, get_config
+from .config import THUEPConfig, get_config
 from .preprocessing_steps import (
     remove_reference_channels,
     extract_frequency_band,
@@ -203,13 +203,7 @@ class THUEPPreprocessingPipeline:
                 if self.config.verbose:
                     print(f"    Shape after artifact_clipping: {data.shape}")
             
-            # Transpose to output format: (n_samples, n_channels, n_stimuli) -> (n_stimuli, n_channels, n_samples)
             data = transpose_to_output_format(data, verbose=self.config.verbose)
-
-            # Scale µV -> mV (matching REVE/FACED convention, done at save time)
-            data = data / 1000.0
-            if self.config.verbose:
-                print(f"  Scaled µV -> mV (divided by 1000)")
 
             # Validate final shape
             expected_final = (

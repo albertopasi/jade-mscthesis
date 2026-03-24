@@ -11,13 +11,13 @@ allowing detailed inspection of the preprocessing effects.
 
 Usage:
     # Interactive viewer with sliders (RECOMMENDED)
-    uv run python -m src.thu_ep.exploration.visualize_raw_vs_preprocessed --viewer
+    uv run python -m src.exploration.thu_ep.visualize_raw_vs_preprocessed --viewer
     
     # Static plot for specific subject/stimulus
-    uv run python -m src.thu_ep.exploration.visualize_raw_vs_preprocessed --subject 1 --stimulus 0
+    uv run python -m src.exploration.thu_ep.visualize_raw_vs_preprocessed --subject 1 --stimulus 0
     
     # Export comparison images
-    uv run python -m src.thu_ep.exploration.visualize_raw_vs_preprocessed --subject 1 --stimulus 0 --export outputs/comparison.png
+    uv run python -m src.exploration.thu_ep.visualize_raw_vs_preprocessed --subject 1 --stimulus 0 --export outputs/comparison.png
 
 Controls in interactive viewer:
     - Sliders: Change subject (1-80) and stimulus (0-27)
@@ -41,7 +41,7 @@ except ImportError:
     print("MNE not installed.")
     sys.exit(1)
 
-from ..config import get_config
+from src.preprocessing.thu_ep.config import get_config
 
 # Load configuration
 _cfg = get_config()

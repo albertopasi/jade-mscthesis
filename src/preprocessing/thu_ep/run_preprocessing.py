@@ -2,22 +2,22 @@
 
 Usage:
     # Process all subjects
-    uv run python -m src.thu_ep.preprocessing.run_preprocessing
+    uv run python -m src.preprocessing.thu_ep.run_preprocessing
 
     # Process specific subjects
-    uv run python -m src.thu_ep.preprocessing.run_preprocessing --subjects 1 2 3
+    uv run python -m src.preprocessing.thu_ep.run_preprocessing --subjects 1 2 3
 
     # Validate preprocessed data
-    uv run python -m src.thu_ep.preprocessing.run_preprocessing --validate
+    uv run python -m src.preprocessing.thu_ep.run_preprocessing --validate
 
     # Process single subject with verbose output
-    uv run python -m src.thu_ep.preprocessing.run_preprocessing --subjects 1 --verbose
+    uv run python -m src.preprocessing.thu_ep.run_preprocessing --subjects 1 --verbose
 """
 
 import argparse
 from pathlib import Path
 
-from ..config import get_config
+from .config import get_config
 from .thu_ep_preprocessing_pipeline import THUEPPreprocessingPipeline
 
 
