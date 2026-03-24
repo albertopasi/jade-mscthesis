@@ -1,1 +1,1 @@
-"Linear Probing pipeline for THU-EP EEG emotion recognition."
+"Linear Probing pipeline for EEG emotion recognition."

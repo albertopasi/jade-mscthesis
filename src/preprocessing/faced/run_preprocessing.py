@@ -4,7 +4,7 @@ Run FACED preprocessing pipeline.
 Converts raw FACED .pkl files (28, 32, 7500) @ 250 Hz
 to preprocessed .npy files (28, 32, 6000) @ 200 Hz.
 
-Steps (matching reve_official/preprocessing/preprocessing_faced.py):
+Steps:
   1. Load sub{NNN}.pkl  →  numpy array (28, 32, 7500)
   2. Resample axis=2: 7500 → 6000  (250 Hz → 200 Hz)
   3. Save as sub{NNN}.npy  →  (28, 32, 6000) float32

@@ -5,9 +5,8 @@ Provides:
   - FACED_CHANNELS: official 32-channel electrode names.
   - FACEDWindowDataset: raw EEG sliding-window dataset loaded into RAM.
 
-Loads preprocessed .npy files (28, 32, 6000) @ 200 Hz from
-data/FACED/preprocessed_v2/. Run src.preprocessing.faced.run_preprocessing
-first to generate them.
+Loads preprocessed .npy files (28, 32, 6000) @ 200 Hz from data/FACED/preprocessed_v2/.
+Run src.preprocessing.faced.run_preprocessing first to generate them.
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ from torch import Tensor
 from torch.utils.data import Dataset
 
 
-# 32 FACED electrode names in official order (matches reve_official config)
+# 32 FACED electrode names in official order
 FACED_CHANNELS: list[str] = [
     "FP1", "FP2", "FZ", "F3", "F4", "F7", "F8",
     "FC1", "FC2", "FC5", "FC6",
@@ -39,7 +38,7 @@ TARGET_SFREQ      = 200
 STIMULUS_DURATION = 30
 N_TIMEPOINTS      = TARGET_SFREQ * STIMULUS_DURATION  # 6000
 
-# 9-class labels per stimulus (official, from preprocessing_faced.py)
+# 9-class labels per stimulus
 _FACED_LABELS: np.ndarray = np.array(
     [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8]
 )
@@ -76,7 +75,7 @@ class FACEDWindowDataset(Dataset):
         data_root:        Path to preprocessed_v2/ directory.
         window_size:      Timepoints per window (default 2000 = 10 s).
         stride:           Stride between windows (default 2000 = non-overlapping).
-        scale_factor:     Divide raw EEG by this (default 1000.0, matching official).
+        scale_factor:     Divide raw EEG by this (default 1000.0).
         stimulus_filter:  If provided, only include these stimulus indices.
     """
 

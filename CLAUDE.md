@@ -1,0 +1,190 @@
+# CLAUDE.md — jade-mscthesis
+
+MSc thesis project: reproduce and extend REVE linear probing downstream task on FACED and THU-EP EEG datasets.
+
+## Always use `uv run python` to run anything (not plain `python`)
+
+```bash
+uv run python -m src.approaches.linear_probing.train_lp ...
+```
+
+---
+
+## Project structure
+
+```
+jade-mscthesis/
+├── configs/
+│   └── thu_ep.yml                  # THU-EP dataset config (paths, channels, sampling)
+├── data/
+│   ├── FACED/
+│   │   ├── Processed_data/         # Raw .pkl files from FACED download (28, 32, 7500)
+│   │   └── preprocessed_v2/        # After preprocessing: sub{NNN}.npy (28, 32, 6000)
+│   └── thu ep/
+│       ├── EEG data/               # Raw .mat files (7500, 32, 28, 6)
+│       └── preprocessed_v2/        # After preprocessing: sub_XX.npy (28, 30, 6000)
+├── models/
+│   └── reve_pretrained_original/
+│       ├── reve-base/              # HuggingFace REVE model (modeling_reve.py, config.json, ...)
+│       └── reve-positions/         # Position bank for EEG channels
+├── outputs/
+│   └── lp_checkpoints/             # Saved classifier weights per fold/run
+├── reve_official/                  # Reference only — will be deleted after implementation
+└── src/
+    ├── approaches/
+    │   └── linear_probing/
+    │       ├── config.py           # LPConfig dataclass + all paths/hyperparameters
+    │       ├── model.py            # ReveClassifierLP, evaluate_model, EmbeddingExtractor
+    │       ├── train_lp.py         # Main entry point — CLI + training loops
+    │       ├── stable_adamw.py     # Port of official StableAdamW optimizer
+    │       ├── summary.py          # Cross-fold summary printing + JSON export
+    │       └── dataset.py          # EmbeddedDataset (fast mode only)
+    ├── datasets/
+    │   ├── faced_dataset.py        # FACEDWindowDataset
+    │   ├── thu_ep_dataset.py       # THUEPWindowDataset (moved from src/thu_ep/)
+    │   └── folds.py                # get_all_subjects, get_kfold_splits, get_stimulus_generalization_split
+    ├── preprocessing/
+    │   ├── faced/
+    │   │   └── run_preprocessing.py  # pkl → npy, scipy.signal.resample 250→200 Hz
+    │   └── thu_ep/
+    │       ├── config.py             # THUEPConfig (reads configs/thu_ep.yml)
+    │       ├── preprocessing_steps.py
+    │       ├── thu_ep_preprocessing_pipeline.py
+    │       └── run_preprocessing.py
+    ├── exploration/                  # Data exploration scripts (not part of pipeline)
+    └── utils/
+        └── callbacks.py              # EpochSummaryCallback (Lightning)
+```
+
+---
+
+## Datasets
+
+### FACED
+- **123 subjects** (0-indexed: 0–122), 32 channels, 28 stimuli, 9 emotions
+- Raw: `.pkl` files `sub000.pkl`–`sub122.pkl`, shape `(28, 32, 7500)` at 250 Hz
+- Preprocessed: `.npy` files, shape `(28, 32, 6000)` at 200 Hz (scipy FFT resample)
+- Values stored in raw µV; divided by `scale_factor=1000` at load time
+
+### THU-EP
+- **80 subjects** (1-indexed: 1–80), subject 75 excluded (corrupted) → **79 usable**
+  - Subject 37: exclude stimuli indices {15, 21, 24}
+  - Subject 46: exclude stimuli indices {3, 9, 17, 23, 26}
+- 30 channels (32 original minus A1, A2), 28 stimuli, 9 emotions
+- Raw: `.mat` (HDF5) files, shape `(7500, 32, 28, 6)` at 250 Hz, 6 frequency bands
+- Preprocessing: extract broadband (band index 5), remove A1/A2, scipy resample 250→200 Hz
+- Preprocessed: `.npy` shape `(28, 30, 6000)` — raw µV values
+- Values divided by `scale_factor=1000` at load time
+
+### Shared label structure (both datasets)
+28 stimuli → 9 emotion classes:
+```
+Stimuli  0-2:  Anger       → class 0  (neg in binary)
+Stimuli  3-5:  Disgust     → class 1  (neg)
+Stimuli  6-8:  Fear        → class 2  (neg)
+Stimuli  9-11: Sadness     → class 3  (neg)
+Stimuli 12-15: Neutral     → class 4  (dropped in binary)
+Stimuli 16-18: Amusement   → class 5  (pos in binary)
+Stimuli 19-21: Inspiration → class 6  (pos)
+Stimuli 22-24: Joy         → class 7  (pos)
+Stimuli 25-27: Tenderness  → class 8  (pos)
+```
+
+---
+
+## REVE model
+
+- Pretrained EEG foundation model at `models/reve_pretrained_original/reve-base`
+- 22 transformer layers, `embed_dim=512`, 8 heads, `patch_size=200`, `overlap=20`
+- Input: `(B, C, T)` EEG + position tensor
+- `forward(eeg, pos, return_output=False)` → `(B, C, H, E)` where H = n_patches
+- `cls_query_token`: trainable `nn.Parameter(torch.randn(1, 1, 512))` — **must remain trainable during LP**
+- `n_patches = floor((window_size - patch_size) / (patch_size - overlap)) + 1`
+  - For `window_size=2000`: n_patches = 11
+
+---
+
+## Linear Probing pipeline
+
+### Step 1 — Preprocess
+
+```bash
+# FACED (123 subjects)
+uv run python -m src.preprocessing.faced.run_preprocessing
+uv run python -m src.preprocessing.faced.run_preprocessing --validate
+
+# THU-EP (79 subjects)
+uv run python -m src.preprocessing.thu_ep.run_preprocessing
+uv run python -m src.preprocessing.thu_ep.run_preprocessing --validate
+```
+
+### Step 2 — Train
+
+```bash
+# Official mode (faithful reproduction) — frozen encoder + trainable cls_query_token
+uv run python -m src.approaches.linear_probing.train_lp \
+    --dataset faced \          # faced | thu-ep
+    --task 9-class \           # 9-class | binary
+    --pooling no \             # no | last | last_avg
+    --window 2000 \            # timepoints (2000 = 10s at 200Hz)
+    --stride 2000              # non-overlapping by default
+
+# Fast mode (pre-computed embeddings, not official)
+uv run python -m src.approaches.linear_probing.train_lp --dataset faced --fast
+
+# Single fold
+uv run python -m src.approaches.linear_probing.train_lp --dataset faced --fold 3
+
+# Generalization evaluation (2/3 stimuli train, 1/3 held-out)
+uv run python -m src.approaches.linear_probing.train_lp --dataset faced --generalization
+
+# Disable mixup or AMP
+uv run python -m src.approaches.linear_probing.train_lp --no-mixup --no-amp
+```
+
+### Evaluation strategies
+1. **10-fold cross-subject CV** (default): KFold(n_splits=10, shuffle=True, seed=42)
+2. **Stimulus generalization** (`--generalization`): train on 2/3 stimuli per emotion, validate on held-out 1/3 stimuli + unseen subjects
+
+---
+
+## Official LP training details (official mode)
+
+| Setting | Value |
+|---|---|
+| Optimizer | StableAdamW (betas=[0.92, 0.999], wd=0.01) |
+| LR | 5e-3 |
+| LR schedule | Exponential warmup (3 epochs) + ReduceLROnPlateau |
+| Epochs | 20 max, patience=10 |
+| Batch size | 64 |
+| Augmentation | Mixup (λ ~ Beta, blended CE loss) |
+| Precision | AMP float16 |
+| Grad clip | max_norm=100 |
+| Dropout | 0.05 |
+| Scale factor | 1000 (µV → mV-range) |
+
+### Pooling modes
+- `no`: query attention → concat [query, patches] → flatten → `(B, (1 + C*H)*E)` → head
+  - FACED 10s window: output dim = (1 + 32×11)×512 = **180,736**
+- `last`: query attention → squeeze → `(B, E=512)` → head
+- `last_avg`: mean pool across patches → `(B, E=512)` → head
+
+Head architecture: `RMSNorm → Dropout → Linear(in, n_classes)`
+
+---
+
+## W&B logging
+
+- Project: `eeg-lp-v2`, Entity: `zl-tudelft-thesis`
+- Set `USE_WANDB = False` in `src/approaches/linear_probing/config.py` to disable
+- Metrics logged: `val_acc`, `val_bal_acc`, `val_auroc`, `val_f1`
+
+---
+
+## Key conventions
+
+- **No MNE** in preprocessing — used `scipy.signal.resample` (matches official REVE preprocessing)
+- **scale_factor=1000** applied at dataset load time, NOT at preprocessing save time
+- Preprocessed files store raw µV values as float32 .npy
+- `reve_official/` is a read-only reference — will be deleted after implementation is complete
+- Windows: `NUM_WORKERS=0` (multiprocessing not supported on Windows with DataLoader)

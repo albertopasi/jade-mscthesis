@@ -1,8 +1,7 @@
 """
-dataset.py — Shared THU-EP dataset utilities.
+thu_ep_dataset.py — Shared THU-EP dataset utilities.
 
-Provides constants and classes used across all approaches (linear probing,
-LoRA fine-tuning, contrastive learning, etc.):
+Provides constants and classes used across all approaches:
   - EXCLUDED_SUBJECTS: corrupted subject IDs to skip.
   - EXCLUDED_STIMULI: per-subject corrupted stimulus indices.
   - _build_stimulus_label_map: maps stimulus index → class label.

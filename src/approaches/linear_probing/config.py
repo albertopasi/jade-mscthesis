@@ -36,7 +36,7 @@ OUTPUT_DIR      = PROJECT_ROOT / "outputs" / "lp_checkpoints"
 # ── W&B ───────────────────────────────────────────────────────────────────────
 
 USE_WANDB     = True
-WANDB_PROJECT = "eeg-lp"
+WANDB_PROJECT = "eeg-lp-v2"
 WANDB_ENTITY  = "zl-tudelft-thesis"
 
 # ── Hardware ──────────────────────────────────────────────────────────────────
