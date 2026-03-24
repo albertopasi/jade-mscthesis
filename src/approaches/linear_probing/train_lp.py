@@ -206,7 +206,7 @@ def train_official_mode(
     print(f"\n{'─' * COL_W}")
     header = (
         f"{'Epoch':>6}  {'EpTime':>7}  {'Elapsed':>8}  "
-        f"{'TrLoss':>8}  {'VaAcc':>7}  {'VaBalAcc':>9}  "
+        f"{'TrLoss':>8}  {'TrAcc':>7}  {'VaAcc':>7}  {'VaBalAcc':>9}  "
         f"{'VaAUROC':>8}  {'VaF1w':>7}  {'LR':>10}"
     )
     print(header)
@@ -223,6 +223,8 @@ def train_official_mode(
         model.train()
         epoch_loss = 0.0
         n_batches = 0
+        n_correct = 0
+        n_samples = 0
 
         for batch in train_loader:
             eeg, target = batch[0].to(device), batch[1].long().to(device)
@@ -252,8 +254,14 @@ def train_official_mode(
 
             epoch_loss += loss.item()
             n_batches += 1
+            # Accuracy against original (unshuffled) labels
+            with torch.no_grad():
+                preds = output.argmax(dim=1)
+            n_correct += (preds == target).sum().item()
+            n_samples += target.size(0)
 
         avg_loss = epoch_loss / max(n_batches, 1)
+        train_acc = n_correct / max(n_samples, 1)
 
         # ── Validate ───────────────────────────────────────────────────
         metrics = evaluate_model(
@@ -281,7 +289,7 @@ def train_official_mode(
 
         print(
             f"{epoch+1:>6}  {fmt_dur(ep_time):>7}  {fmt_dur(elapsed):>8}  "
-            f"{avg_loss:>8.4f}  {val_acc:>7.4f}  {metrics['balanced_acc']:>9.4f}  "
+            f"{avg_loss:>8.4f}  {train_acc:>7.4f}  {val_acc:>7.4f}  {metrics['balanced_acc']:>9.4f}  "
             f"{metrics['auroc']:>8.4f}  {metrics['f1_weighted']:>7.4f}  "
             f"{lr:>10.2e}  ({eta})"
         )
@@ -367,6 +375,13 @@ def run_fold_official(
         dropout=cfg.dropout,
     )
     print(f"Trainable parameters: {model.n_trainable_params():,}")
+
+    # torch.compile (PyTorch 2.0+) — speeds up repeated forward passes
+    try:
+        model = torch.compile(model)
+        print("torch.compile: enabled")
+    except Exception as e:
+        print(f"torch.compile: skipped ({e})")
 
     # W&B logging
     run_name = cfg.run_name(fold_idx, gen_seed)
