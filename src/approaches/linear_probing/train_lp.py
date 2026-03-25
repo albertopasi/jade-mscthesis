@@ -68,7 +68,7 @@ from src.approaches.linear_probing.summary import (
 
 # ── Formatting helpers ────────────────────────────────────────────────────────
 
-COL_W = 90
+COL_W = 105
 
 def fmt_dur(seconds: float) -> str:
     h, rem = divmod(int(seconds), 3600)
@@ -206,7 +206,7 @@ def train_official_mode(
     print(f"\n{'─' * COL_W}")
     header = (
         f"{'Epoch':>6}  {'EpTime':>7}  {'Elapsed':>8}  "
-        f"{'TrLoss':>8}  {'TrAcc':>7}  {'VaAcc':>7}  {'VaBalAcc':>9}  "
+        f"{'TrLoss':>8}  {'TrAcc':>7}  {'VaLoss':>8}  {'VaAcc':>7}  {'VaBalAcc':>9}  "
         f"{'VaAUROC':>8}  {'VaF1w':>7}  {'LR':>10}"
     )
     print(header)
@@ -289,7 +289,7 @@ def train_official_mode(
 
         print(
             f"{epoch+1:>6}  {fmt_dur(ep_time):>7}  {fmt_dur(elapsed):>8}  "
-            f"{avg_loss:>8.4f}  {train_acc:>7.4f}  {val_acc:>7.4f}  {metrics['balanced_acc']:>9.4f}  "
+            f"{avg_loss:>8.4f}  {train_acc:>7.4f}  {metrics['val_loss']:>8.4f}  {val_acc:>7.4f}  {metrics['balanced_acc']:>9.4f}  "
             f"{metrics['auroc']:>8.4f}  {metrics['f1_weighted']:>7.4f}  "
             f"{lr:>10.2e}  ({eta})"
         )
@@ -299,6 +299,7 @@ def train_official_mode(
             wandb.log({
                 "train/loss":    avg_loss,
                 "train/acc":     train_acc,
+                "val/loss":      metrics["val_loss"],
                 "val/acc":       val_acc,
                 "val/bal_acc":   metrics["balanced_acc"],
                 "val/auroc":     metrics["auroc"],

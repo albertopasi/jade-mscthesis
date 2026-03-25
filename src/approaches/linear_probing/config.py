@@ -148,12 +148,16 @@ class LPConfig:
     def norm_tag(self) -> str:
         return "_norm" if self.normalize_features else ""
 
+    @property
+    def mixup_tag(self) -> str:
+        return "" if self.use_mixup else "_nomixup"
+
     def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
         gen = f"_gen_s{gen_seed}" if gen_seed is not None else ""
         return (
             f"lp_{self.dataset}_{self.data_tag}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_{self.mode_tag}"
-            f"{self.norm_tag}{gen}_fold_{fold_idx}"
+            f"{self.norm_tag}{self.mixup_tag}{gen}_fold_{fold_idx}"
         )
 
     def group_name(self) -> str:
@@ -161,7 +165,7 @@ class LPConfig:
         return (
             f"lp_{self.dataset}_{self.data_tag}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_{self.mode_tag}"
-            f"{self.norm_tag}{gen}"
+            f"{self.norm_tag}{self.mixup_tag}{gen}"
         )
 
     def hparams_dict(

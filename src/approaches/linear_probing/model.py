@@ -241,6 +241,7 @@ def evaluate_model(
 
     all_preds, all_targets, all_probs = [], [], []
     score, count = 0, 0
+    total_loss = 0.0
 
     for batch in loader:
         eeg, target = batch[0].to(device), batch[1].long().to(device)
@@ -248,6 +249,9 @@ def evaluate_model(
         with torch.autocast(device_type=device_type, enabled=use_amp, dtype=torch.float16):
             with torch.inference_mode():
                 output = model(eeg)
+
+        loss = F.cross_entropy(output.float(), target)
+        total_loss += loss.item() * target.shape[0]
 
         decisions = torch.argmax(output, dim=1)
         score += (decisions == target).int().sum().item()
@@ -262,11 +266,13 @@ def evaluate_model(
     pr_probs = torch.cat(all_probs).numpy()
 
     acc = score / count
+    avg_loss = total_loss / max(count, 1)
     bal_acc = balanced_accuracy_score(gt, pr)
     f1_w = f1_score(gt, pr, average="weighted")
 
     metrics = {
         "accuracy": acc,
+        "val_loss": avg_loss,
         "balanced_acc": bal_acc,
         "f1_weighted": f1_w,
         "auroc": 0.0,

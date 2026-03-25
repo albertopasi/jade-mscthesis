@@ -1,0 +1,111 @@
+{
+  "dataset": "thu-ep",
+  "task_mode": "binary",
+  "mode": "official",
+  "completed_at": "2026-03-25T08:53:42.556085",
+  "n_folds_run": 10,
+  "mean": {
+    "val_acc": 0.5643,
+    "val_bal_acc": 0.5645,
+    "val_auroc": 0.5706,
+    "val_f1": 0.5469
+  },
+  "std": {
+    "val_acc": 0.0323,
+    "val_bal_acc": 0.032,
+    "val_auroc": 0.0348,
+    "val_f1": 0.0383
+  },
+  "folds": [
+    {
+      "val_acc": 0.5625,
+      "val_bal_acc": 0.5625,
+      "val_auroc": 0.5760633680555556,
+      "val_f1": 0.5566794942275975,
+      "best_epoch": 20,
+      "epochs_trained": 20,
+      "fold": 1
+    },
+    {
+      "val_acc": 0.5355191256830601,
+      "val_bal_acc": 0.5381720430107526,
+      "val_auroc": 0.5590203106332138,
+      "val_f1": 0.523191671198819,
+      "best_epoch": 9,
+      "epochs_trained": 20,
+      "fold": 2
+    },
+    {
+      "val_acc": 0.5572916666666666,
+      "val_bal_acc": 0.5572916666666667,
+      "val_auroc": 0.574490017361111,
+      "val_f1": 0.5567024310742904,
+      "best_epoch": 10,
+      "epochs_trained": 20,
+      "fold": 3
+    },
+    {
+      "val_acc": 0.5625,
+      "val_bal_acc": 0.5625,
+      "val_auroc": 0.532497829861111,
+      "val_f1": 0.48121461657231085,
+      "best_epoch": 14,
+      "epochs_trained": 20,
+      "fold": 4
+    },
+    {
+      "val_acc": 0.53125,
+      "val_bal_acc": 0.53125,
+      "val_auroc": 0.5852864583333334,
+      "val_f1": 0.52997497551953,
+      "best_epoch": 5,
+      "epochs_trained": 20,
+      "fold": 5
+    },
+    {
+      "val_acc": 0.5677083333333334,
+      "val_bal_acc": 0.5677083333333333,
+      "val_auroc": 0.5309244791666667,
+      "val_f1": 0.5375910396657285,
+      "best_epoch": 14,
+      "epochs_trained": 20,
+      "fold": 6
+    },
+    {
+      "val_acc": 0.5260416666666666,
+      "val_bal_acc": 0.5260416666666666,
+      "val_auroc": 0.542697482638889,
+      "val_f1": 0.5133554299083642,
+      "best_epoch": 9,
+      "epochs_trained": 20,
+      "fold": 7
+    },
+    {
+      "val_acc": 0.6302083333333334,
+      "val_bal_acc": 0.6302083333333334,
+      "val_auroc": 0.6404079861111112,
+      "val_f1": 0.602136415375186,
+      "best_epoch": 4,
+      "epochs_trained": 19,
+      "fold": 8
+    },
+    {
+      "val_acc": 0.6041666666666666,
+      "val_bal_acc": 0.6041666666666667,
+      "val_auroc": 0.6102430555555556,
+      "val_f1": 0.6041237113402061,
+      "best_epoch": 9,
+      "epochs_trained": 20,
+      "fold": 9
+    },
+    {
+      "val_acc": 0.5654761904761905,
+      "val_bal_acc": 0.5654761904761905,
+      "val_auroc": 0.5547760770975056,
+      "val_f1": 0.5636053090417393,
+      "best_epoch": 20,
+      "epochs_trained": 20,
+      "fold": 10
+    }
+  ]
+}
