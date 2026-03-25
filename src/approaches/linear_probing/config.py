@@ -95,7 +95,7 @@ class LPConfig:
     weight_decay: float = 0.01
     warmup_epochs: int = 3
     scheduler_patience: int = 5
-    early_stop_patience: int = 15
+    early_stop_patience: int = 11
     grad_clip: float = 100.0
 
     # Regularization / precision

@@ -84,7 +84,7 @@ def print_fold_summary(
     gen_tag_name = f"_gen_s{gen_seed}" if gen_seed is not None else ""
     agg_path = (
         OUTPUT_DIR / f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_{cfg.mode_tag}{gen_tag_name}.json"
+        f"{cfg.pool_tag}_{cfg.mode_tag}{cfg.mixup_tag}{gen_tag_name}.json"
     )
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     agg = {
@@ -155,7 +155,7 @@ def print_cross_seed_summary(
 
     agg_path = (
         OUTPUT_DIR / f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_{cfg.mode_tag}_gen_cross_seed.json"
+        f"{cfg.pool_tag}_{cfg.mode_tag}{cfg.mixup_tag}_gen_cross_seed.json"
     )
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     agg = {

@@ -671,7 +671,7 @@ def parse_args() -> LPConfig:
                         help="Stride in seconds (default: 10, non-overlapping)")
 
     # Training
-    parser.add_argument("--epochs", type=int, default=20, help="Max epochs (default: 20)")
+    parser.add_argument("--epochs", type=int, default=50, help="Max epochs (default: 50)")
     parser.add_argument("--lr", type=float, default=5e-3, help="Learning rate (default: 5e-3)")
     parser.add_argument("--batch-size", type=int, default=64, help="Batch size (default: 64)")
 

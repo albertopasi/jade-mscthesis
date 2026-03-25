@@ -159,3 +159,51 @@ Binary tasks retain ~83–85% of CV performance when stimuli change. 9-class tas
 | **Non-linear classification head** | AUROC >> accuracy in 9-class indicates the linear boundary is suboptimal; even a small MLP head could better exploit the existing representation geometry. |
 | **Longer training** | Many folds still improving at epoch 20 — extend `max_epochs` to 30–50 with current early stopping patience. |
 | **More seeds in generalisation** | Binary shows 2.1% seed variance; 5+ seeds would give a more stable estimate of generalisation performance. |
+
+---
+
+## 6. Ablations
+
+### 6.1 Mixup On vs Off (w10s10, cross-subject CV)
+
+Mixup was disabled (`--no-mixup`) and all four settings re-run with the same configuration.
+
+| Dataset | Task | With Mixup | No Mixup | Δ Acc | Δ AUROC |
+|---|---|---|---|---|---|
+| FACED | Binary | 70.57% ± 1.56% | **71.50% ± 1.58%** | +0.93 pp | +0.86 pp |
+| FACED | 9-class | 48.91% ± 2.86% | **49.72% ± 2.93%** | +0.81 pp | −0.48 pp |
+| THU-EP | Binary | **65.07% ± 3.31%** | 64.40% ± 3.81% | −0.67 pp | −1.49 pp |
+| THU-EP | 9-class | 41.06% ± 2.06% | **41.08% ± 3.04%** | +0.02 pp | −1.13 pp |
+
+**Interpretation:**
+
+All differences are within one standard deviation of fold variance — mixup has no meaningful effect on final performance in this setting.
+
+This is not surprising given the architecture constraints: only the `cls_query_token` and linear head are trainable (≈1.7M parameters), while the REVE encoder is fully frozen. With such a small trainable parameter space, overfitting risk is low and the model cannot memorise training samples in the way that makes mixup beneficial. Mixup was designed to regularise models that can overfit by memorising — here the frozen encoder already acts as a strong implicit regulariser.
+
+One secondary observation: no-mixup yields slightly higher fold variance on THU-EP binary (3.81% vs 3.31%), suggesting marginally less stable optimisation trajectories without the smoothing effect of label blending, but the effect is negligible in practice.
+
+**Conclusion:** mixup neither helps nor hurts in this linear-probing setting. It may become more relevant once fine-tuning (LoRA) is introduced and the trainable parameter count grows substantially.
+
+---
+
+### 6.2 Window Size: 6 s vs 10 s (FACED, cross-subject CV)
+
+FACED was re-run with a 6-second non-overlapping window (`--window 6 --stride 6`, 1200 pts) to assess sensitivity to temporal context length.
+
+| Task | w=10 s (baseline) | w=6 s | Δ Acc | Δ AUROC |
+|---|---|---|---|---|
+| Binary | 70.57% ± 1.56% | 64.68% ± 1.47% | **−5.89 pp** | −7.37 pp |
+| 9-class | 48.91% ± 2.86% | 35.83% ± 2.27% | **−13.08 pp** | −8.97 pp |
+
+**REVE patch counts:**
+- w=10 s (2000 pts): `floor((2000−200)/180) + 1 = 11 patches` per channel → classifier input dim = (1 + 32×11)×512 = **180,736**
+- w=6 s (1200 pts): `floor((1200−200)/180) + 1 = 6 patches` per channel → classifier input dim = (1 + 32×6)×512 = **98,816**
+
+Despite producing more windows per stimulus (5 vs 3 for a 30 s trial), the 6 s window performs substantially worse:
+
+- **Binary drops 5.89 pp.** Valence classification is robust to some temporal reduction but still suffers — emotional arousal and valence signatures accumulate over time, and 6 s captures roughly half the temporal structure.
+- **9-class drops 13.08 pp.** Fine-grained emotion classification is far more sensitive to temporal context. Distinguishing, say, Anger from Fear or Joy from Amusement requires integrating subtle sustained patterns that only emerge over longer windows. The near-halving of patch count (6 vs 11) means REVE processes far less intra-trial temporal dynamics.
+- The **AUROC also drops** (−8.97 pp in 9-class), indicating the 10 s representations are richer not just in argmax accuracy but in their overall separability — the ranking structure degrades, not just the decision boundary.
+
+**Conclusion:** the 10 s window is clearly the better choice. Shorter windows provide a marginal speed benefit but sacrifice substantial emotion-discriminative temporal context. All further experiments should use w=10 s.
