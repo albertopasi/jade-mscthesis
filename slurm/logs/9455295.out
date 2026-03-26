@@ -1,0 +1,22 @@
+=== Experiment on DelftBlue ===
+Job ID:    9455295
+Node:      gpu016
+Partition: gpu-a100
+Module:    src.approaches.fine_tuning.train_ft
+Args:      --dataset thu-ep --task binary --generalization --gen-seeds 123 456 789
+Started:   Thu Mar 26 15:49:51 CET 2026
+
+=== GPU ===
+NVIDIA A100 80GB PCIe, 81920 MiB
+
+=== Environment ===
+Python:  Python 3.14.3
+PyTorch: 2.9.1+cu128
+CUDA:    True 12.8
+
+=== Running: python -m src.approaches.fine_tuning.train_ft --dataset thu-ep --task binary --generalization --gen-seeds 123 456 789 ===
+
+
+=== Complete ===
+Exit code: 1
+Finished:  Thu Mar 26 15:51:12 CET 2026

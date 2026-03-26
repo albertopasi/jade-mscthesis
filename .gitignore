@@ -11,7 +11,7 @@ __pycache__
 
 output
 outputs/lp_checkpoints/lp*
-outputs/lora_checkpoints/lora*
+outputs/ft_checkpoints/ft*
 .pytest_cache
 
 debug_output
