@@ -106,12 +106,16 @@ class FTConfig:
     def pool_tag(self) -> str:
         return f"pool_{self.pooling}"
 
+    @property
+    def mixup_tag(self) -> str:
+        return "" if self.use_mixup else "_nomixup"
+
     def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
         gen = f"_gen_s{gen_seed}" if gen_seed is not None else ""
         return (
             f"ft_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}{gen}_fold_{fold_idx}"
+            f"r{self.lora_rank}{self.mixup_tag}{gen}_fold_{fold_idx}"
         )
 
     def group_name(self) -> str:
@@ -119,7 +123,7 @@ class FTConfig:
         return (
             f"ft_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}{gen}"
+            f"r{self.lora_rank}{self.mixup_tag}{gen}"
         )
 
     def hparams_dict(
