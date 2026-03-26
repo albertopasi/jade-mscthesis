@@ -723,6 +723,9 @@ def parse_args() -> LPConfig:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    import multiprocessing
+    multiprocessing.set_start_method("fork", force=True)
+
     cfg = parse_args()
 
     L.seed_everything(42, workers=True)

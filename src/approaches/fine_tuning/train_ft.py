@@ -593,6 +593,9 @@ def parse_args() -> FTConfig:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    import multiprocessing
+    multiprocessing.set_start_method("fork", force=True)
+
     import lightning as L
     L.seed_everything(42, workers=True)
 
