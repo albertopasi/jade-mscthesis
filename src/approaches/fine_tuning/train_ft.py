@@ -48,9 +48,27 @@ from src.approaches.linear_probing.model import (
 from src.approaches.linear_probing.stable_adamw import StableAdamW
 from src.approaches.linear_probing.train_lp import (
     build_raw_dataset, get_channel_names,
-    PatienceMonitor, _get_exponential_warmup_lambda,
-    fmt_dur, fmt_metric, COL_W,
+    _get_exponential_warmup_lambda,
+    fmt_dur, COL_W,
 )
+
+
+class _PatienceMonitor:
+    """Early stopping monitor matching official REVE: stops when counter > patience."""
+
+    def __init__(self, patience: int = 10):
+        self.patience = patience
+        self.best_val = 0.0
+        self.counter = 0
+
+    def __call__(self, val: float) -> bool:
+        if val > self.best_val:
+            self.best_val = val
+            self.counter = 0
+            return False
+        else:
+            self.counter += 1
+            return self.counter > self.patience
 
 from src.approaches.fine_tuning.config import (
     FTConfig, OUTPUT_DIR,
@@ -61,188 +79,57 @@ from src.approaches.fine_tuning.model import ReveClassifierFT
 from src.approaches.fine_tuning.lora import apply_lora, print_lora_summary
 
 
-# ── Summary helpers (delegate to LP summary with FT output dir) ──────────────
+# ── Summary helpers (thin wrappers around shared module) ─────────────────────
+
+from src.approaches.shared.summary import (
+    print_fold_summary as _print_fold_summary,
+    print_cross_seed_summary as _print_cross_seed_summary,
+)
+
+
+def _fold_filename(cfg: FTConfig, gen_seed: int | None) -> str:
+    gen_tag = f"_gen_s{gen_seed}" if gen_seed is not None else ""
+    return (
+        f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
+        f"{cfg.pool_tag}_r{cfg.lora_rank}{gen_tag}"
+    )
+
+
+def _cross_seed_filename(cfg: FTConfig) -> str:
+    return (
+        f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
+        f"{cfg.pool_tag}_r{cfg.lora_rank}_gen_cross_seed"
+    )
+
 
 def print_fold_summary(
     cfg: FTConfig,
     fold_results: list[dict],
     gen_seed: int | None = None,
 ) -> None:
-    """Print per-fold metrics table and save aggregate JSON for FT runs."""
-    import datetime
-    import json
-    import math
-
-    seed_label = f"  |  gen_seed={gen_seed}" if gen_seed is not None else ""
-
-    print(f"\n{'=' * COL_W}")
-    print(
-        f"  CROSS-FOLD SUMMARY  ({len(fold_results)} folds  |  {cfg.dataset}  |  "
-        f"task={cfg.task_mode}  |  {cfg.pool_tag}  |  LoRA r={cfg.lora_rank}{seed_label})"
+    _print_fold_summary(
+        cfg,
+        fold_results,
+        output_dir=OUTPUT_DIR,
+        approach_label=f"LoRA r={cfg.lora_rank}",
+        filename_stem=_fold_filename(cfg, gen_seed),
+        extra_json={"approach": "ft_lora", "lora_rank": cfg.lora_rank},
+        gen_seed=gen_seed,
     )
-    print(f"{'=' * COL_W}")
-
-    col = (
-        f"{'Fold':>5}  {'ValAcc':>8}  {'ValBalAcc':>10}  {'ValAUROC':>9}  "
-        f"{'ValF1w':>8}  {'LPEp':>6}  {'FTEp':>6}  {'BestEp':>7}"
-    )
-    print(col)
-    print("-" * len(col))
-
-    accs, bal_accs, aurocs, f1s = [], [], [], []
-    for r in fold_results:
-        acc     = r.get("val_acc")
-        bal_acc = r.get("val_bal_acc")
-        auroc   = r.get("val_auroc")
-        f1      = r.get("val_f1")
-        if acc     is not None: accs.append(acc)
-        if bal_acc is not None: bal_accs.append(bal_acc)
-        if auroc   is not None: aurocs.append(auroc)
-        if f1      is not None: f1s.append(f1)
-
-        def _fmt(val, w=8):
-            if val is None or (isinstance(val, float) and math.isnan(val)):
-                return f"{'n/a':>{w}}"
-            return f"{val:>{w}.4f}"
-
-        print(
-            f"{r['fold']:>5}  "
-            f"{_fmt(acc):>8}  {_fmt(bal_acc):>10}  {_fmt(auroc):>9}  {_fmt(f1):>8}  "
-            f"{r.get('lp_epochs_trained', 0):>6}  "
-            f"{r.get('ft_epochs_trained', 0):>6}  "
-            f"{r.get('best_epoch', 0):>7}"
-        )
-
-    print("-" * len(col))
-
-    def _stat(vals):
-        if not vals:
-            return "n/a", "n/a"
-        mean = statistics.mean(vals)
-        std  = statistics.stdev(vals) if len(vals) > 1 else 0.0
-        return f"{mean:.4f}", f"{std:.4f}"
-
-    acc_mean, acc_std = _stat(accs)
-    bal_mean, bal_std = _stat(bal_accs)
-    aur_mean, aur_std = _stat(aurocs)
-    f1_mean,  f1_std  = _stat(f1s)
-
-    print(f"{'Mean':>5}  {acc_mean:>8}  {bal_mean:>10}  {aur_mean:>9}  {f1_mean:>8}")
-    print(f"{'Std':>5}  {acc_std:>8}  {bal_std:>10}  {aur_std:>9}  {f1_std:>8}")
-    print(f"{'=' * COL_W}")
-
-    # Save aggregate JSON
-    gen_tag_name = f"_gen_s{gen_seed}" if gen_seed is not None else ""
-    agg_path = (
-        OUTPUT_DIR / f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_r{cfg.lora_rank}{gen_tag_name}.json"
-    )
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    agg = {
-        "dataset":      cfg.dataset,
-        "task_mode":    cfg.task_mode,
-        "approach":     "ft_lora",
-        "lora_rank":    cfg.lora_rank,
-        "completed_at": datetime.datetime.now().isoformat(),
-        "n_folds_run":  len(fold_results),
-        "mean": {
-            "val_acc":     round(statistics.mean(accs), 4)     if accs     else None,
-            "val_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
-            "val_auroc":   round(statistics.mean(aurocs), 4)   if aurocs   else None,
-            "val_f1":      round(statistics.mean(f1s), 4)      if f1s      else None,
-        },
-        "std": {
-            "val_acc":     round(statistics.stdev(accs), 4)     if len(accs)     > 1 else 0.0,
-            "val_bal_acc": round(statistics.stdev(bal_accs), 4) if len(bal_accs) > 1 else 0.0,
-            "val_auroc":   round(statistics.stdev(aurocs), 4)   if len(aurocs)   > 1 else 0.0,
-            "val_f1":      round(statistics.stdev(f1s), 4)      if len(f1s)      > 1 else 0.0,
-        },
-        "folds": fold_results,
-    }
-    with open(agg_path, "w", encoding="utf-8") as f:
-        json.dump(agg, f, indent=2)
-    print(f"Aggregate results saved -> {agg_path}")
 
 
 def print_cross_seed_summary(
     cfg: FTConfig,
     seed_summaries: list[dict],
 ) -> None:
-    """Print aggregate statistics across multiple generalization seeds."""
-    print(f"\n{'=' * COL_W}")
-    print(
-        f"  CROSS-SEED SUMMARY  ({len(seed_summaries)} seeds  |  {cfg.dataset}  |  "
-        f"task={cfg.task_mode}  |  {cfg.pool_tag}  |  LoRA r={cfg.lora_rank})"
+    _print_cross_seed_summary(
+        cfg,
+        seed_summaries,
+        output_dir=OUTPUT_DIR,
+        approach_label=f"LoRA r={cfg.lora_rank}",
+        filename_stem=_cross_seed_filename(cfg),
+        extra_json={"approach": "ft_lora", "lora_rank": cfg.lora_rank},
     )
-    print(f"{'=' * COL_W}")
-
-    col = f"{'Seed':>6}  {'MeanAcc':>9}  {'MeanBalAcc':>11}  {'MeanF1':>9}"
-    print(col)
-    print("-" * len(col))
-
-    accs, bal_accs, f1s = [], [], []
-    for s in seed_summaries:
-        acc     = s.get("mean_acc")
-        bal_acc = s.get("mean_bal_acc")
-        f1      = s.get("mean_f1")
-        if acc     is not None: accs.append(acc)
-        if bal_acc is not None: bal_accs.append(bal_acc)
-        if f1      is not None: f1s.append(f1)
-        print(
-            f"{s['seed']:>6}  "
-            f"{fmt_metric(acc):>9}  "
-            f"{fmt_metric(bal_acc):>11}  "
-            f"{fmt_metric(f1):>9}"
-        )
-
-    print("-" * len(col))
-
-    def _stat(vals):
-        if not vals:
-            return "n/a", "n/a"
-        mean = statistics.mean(vals)
-        std  = statistics.stdev(vals) if len(vals) > 1 else 0.0
-        return f"{mean:.4f}", f"{std:.4f}"
-
-    acc_mean, acc_std = _stat(accs)
-    bal_mean, bal_std = _stat(bal_accs)
-    f1_mean,  f1_std  = _stat(f1s)
-
-    print(f"{'Mean':>6}  {acc_mean:>9}  {bal_mean:>11}  {f1_mean:>9}")
-    print(f"{'Std':>6}  {acc_std:>9}  {bal_std:>11}  {f1_std:>9}")
-    print(f"{'=' * COL_W}")
-
-    import datetime
-    import json
-
-    agg_path = (
-        OUTPUT_DIR / f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_r{cfg.lora_rank}_gen_cross_seed.json"
-    )
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    agg = {
-        "dataset":      cfg.dataset,
-        "task_mode":    cfg.task_mode,
-        "approach":     "ft_lora",
-        "lora_rank":    cfg.lora_rank,
-        "completed_at": datetime.datetime.now().isoformat(),
-        "n_seeds":      len(seed_summaries),
-        "seeds":        [s["seed"] for s in seed_summaries],
-        "mean": {
-            "val_acc":     round(statistics.mean(accs), 4)     if accs     else None,
-            "val_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
-            "val_f1":      round(statistics.mean(f1s), 4)      if f1s      else None,
-        },
-        "std": {
-            "val_acc":     round(statistics.stdev(accs), 4)     if len(accs)     > 1 else 0.0,
-            "val_bal_acc": round(statistics.stdev(bal_accs), 4) if len(bal_accs) > 1 else 0.0,
-            "val_f1":      round(statistics.stdev(f1s), 4)      if len(f1s)      > 1 else 0.0,
-        },
-        "per_seed": seed_summaries,
-    }
-    with open(agg_path, "w", encoding="utf-8") as f:
-        json.dump(agg, f, indent=2)
-    print(f"Cross-seed aggregate saved -> {agg_path}")
 
 
 # ── Generic training stage ───────────────────────────────────────────────────
@@ -265,6 +152,7 @@ def train_stage(
     n_classes: int,
     device: str,
     wandb_epoch_offset: int = 0,
+    save_trainable_only: bool = False,
 ) -> dict:
     """
     Shared training loop for both LP warmup and FT stages.
@@ -290,7 +178,7 @@ def train_stage(
     )
 
     scaler = torch.amp.GradScaler()
-    patience_monitor = PatienceMonitor(early_stop_patience)
+    patience_monitor = _PatienceMonitor(early_stop_patience)
 
     best_metrics = {}
     best_acc = 0.0
@@ -312,7 +200,7 @@ def train_stage(
     for epoch in range(max_epochs):
         last_epoch = epoch
         epoch_start = time.time()
-        warmup_active = epoch <= warmup_epochs
+        warmup_active = epoch < warmup_epochs
 
         # ── Train ──────────────────────────────────────────────────────
         model.train()
@@ -324,7 +212,7 @@ def train_stage(
         for batch in train_loader:
             eeg, target = batch[0].to(device), batch[1].long().to(device)
 
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             with torch.autocast(device_type=device_type, enabled=use_amp, dtype=torch.float16):
                 if use_mixup:
                     mm = random.random()
@@ -337,10 +225,7 @@ def train_stage(
 
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(
-                (p for p in model.parameters() if p.requires_grad),
-                grad_clip,
-            )
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
 
             scale_before = scaler.get_scale()
             scaler.step(optimizer)
@@ -366,17 +251,28 @@ def train_stage(
         )
 
         val_acc = metrics["accuracy"]
-        reduce_scheduler.step(val_acc)
+        val_bal_acc = metrics["balanced_acc"]
 
-        # Track best
+        # Scheduler on val_acc, gated behind warmup (matches official)
+        if epoch > warmup_epochs:
+            reduce_scheduler.step(val_acc)
+
+        # Track best by accuracy
         if val_acc > best_acc:
             best_acc = val_acc
             best_metrics = {**metrics, "epoch": epoch + 1}
-            # Save all trainable params
-            best_state = {
-                k: v.cpu().clone()
-                for k, v in model.state_dict().items()
-            }
+            if save_trainable_only:
+                trainable_keys = {n for n, p in model.named_parameters() if p.requires_grad}
+                best_state = {
+                    k: v.cpu().clone()
+                    for k, v in model.state_dict().items()
+                    if k in trainable_keys
+                }
+            else:
+                best_state = {
+                    k: v.cpu().clone()
+                    for k, v in model.state_dict().items()
+                }
 
         # Print epoch summary
         ep_time = time.time() - epoch_start
@@ -398,6 +294,7 @@ def train_stage(
             wandb.log({
                 f"{stage_name}/train_loss": avg_loss,
                 f"{stage_name}/train_acc":  train_acc,
+                f"{stage_name}/val_loss":   metrics.get("val_loss"),
                 f"{stage_name}/val_acc":    val_acc,
                 f"{stage_name}/val_bal_acc": metrics["balanced_acc"],
                 f"{stage_name}/val_auroc":  metrics["auroc"],
@@ -405,7 +302,7 @@ def train_stage(
                 f"{stage_name}/lr":         current_lr,
             }, step=wandb_epoch_offset + epoch + 1)
 
-        # Early stopping
+        # Early stopping on accuracy
         if patience_monitor(val_acc):
             print(f"Early stopping at epoch {epoch + 1} (patience={early_stop_patience})")
             break
@@ -525,12 +422,13 @@ def run_fold_ft(
         n_classes=cfg.num_classes,
         device=DEVICE,
         wandb_epoch_offset=0,
+        save_trainable_only=True,
     )
     lp_epochs = lp_result["epochs_trained"]
 
-    # Restore best LP state before moving to FT
+    # Restore best LP state before moving to FT (partial state — trainable only)
     if lp_result.get("best_state"):
-        model.load_state_dict(lp_result["best_state"])
+        model.load_state_dict(lp_result["best_state"], strict=False)
         model.to(DEVICE)
 
     # ── Stage 2: LoRA fine-tuning ─────────────────────────────────────
@@ -611,52 +509,59 @@ def run_fold_ft(
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def parse_args() -> FTConfig:
+    _d = FTConfig()  # single source of truth for all defaults
+    _w = round(_d.window_size / SAMPLING_RATE)
+    _st = round(_d.stride / SAMPLING_RATE)
+
     parser = argparse.ArgumentParser(description="Fine-Tuning with LoRA on REVE")
 
-    parser.add_argument("--dataset", choices=["faced", "thu-ep"], default="faced",
-                        help="Dataset (default: faced)")
-    parser.add_argument("--task", choices=["binary", "9-class"], default="binary",
-                        help="Classification task (default: binary)")
+    parser.add_argument("--dataset", choices=["faced", "thu-ep"], default=_d.dataset)
+    parser.add_argument("--task", choices=["binary", "9-class"], default=_d.task_mode,
+                        help="Classification task")
     parser.add_argument("--fold", type=int, default=None, metavar="N",
                         help="Run only this fold (1-10). Omit for all folds.")
 
     # Pooling
-    parser.add_argument("--pooling", choices=["no", "last", "last_avg"], default="no",
-                        help="Pooling mode (default: no)")
+    parser.add_argument("--pooling", choices=["no", "last", "last_avg"], default=_d.pooling)
 
     # Window
-    parser.add_argument("--window", type=float, default=10.0, metavar="S",
-                        help="Window length in seconds (default: 10)")
-    parser.add_argument("--stride", type=float, default=10.0, metavar="S",
-                        help="Stride in seconds (default: 10)")
+    parser.add_argument("--window", type=float, default=_w, metavar="S",
+                        help=f"Window length in seconds (default: {_w})")
+    parser.add_argument("--stride", type=float, default=_st, metavar="S",
+                        help=f"Stride in seconds (default: {_st})")
 
     # Shared training
-    parser.add_argument("--batch-size", type=int, default=64, help="Batch size (default: 64)")
-    parser.add_argument("--no-mixup", dest="use_mixup", action="store_false", default=True,
-                        help="Disable mixup augmentation")
-    parser.add_argument("--no-amp", dest="use_amp", action="store_false", default=True,
-                        help="Disable mixed precision")
+    parser.add_argument("--batch-size", type=int, default=_d.batch_size)
+    parser.add_argument("--no-mixup", dest="use_mixup", action="store_false",
+                        default=_d.use_mixup, help="Disable mixup augmentation")
+    parser.add_argument("--no-amp", dest="use_amp", action="store_false",
+                        default=_d.use_amp, help="Disable mixed precision")
 
     # LP stage
-    parser.add_argument("--lp-epochs", type=int, default=20, help="LP max epochs (default: 20)")
-    parser.add_argument("--lp-lr", type=float, default=5e-3, help="LP learning rate (default: 5e-3)")
+    parser.add_argument("--lp-epochs", type=int, default=_d.lp_max_epochs,
+                        help=f"LP max epochs (default: {_d.lp_max_epochs})")
+    parser.add_argument("--lp-lr", type=float, default=_d.lp_lr,
+                        help=f"LP learning rate (default: {_d.lp_lr})")
 
     # FT stage
-    parser.add_argument("--ft-epochs", type=int, default=200, help="FT max epochs (default: 200)")
-    parser.add_argument("--ft-lr", type=float, default=1e-4, help="FT learning rate (default: 1e-4)")
+    parser.add_argument("--ft-epochs", type=int, default=_d.ft_max_epochs,
+                        help=f"FT max epochs (default: {_d.ft_max_epochs})")
+    parser.add_argument("--ft-lr", type=float, default=_d.ft_lr,
+                        help=f"FT learning rate (default: {_d.ft_lr})")
 
     # LoRA
-    parser.add_argument("--lora-rank", type=int, default=16, help="LoRA rank (default: 16)")
+    parser.add_argument("--lora-rank", type=int, default=_d.lora_rank,
+                        help=f"LoRA rank (default: {_d.lora_rank})")
     parser.add_argument("--lora-alpha", type=int, default=None,
                         help="LoRA alpha (default: same as rank)")
-    parser.add_argument("--lora-target", choices=["attention", "attention+ffn"], default="attention",
-                        help="LoRA target modules (default: attention)")
+    parser.add_argument("--lora-target", choices=["attention", "attention+ffn"],
+                        default=_d.lora_target)
 
     # Generalization
-    parser.add_argument("--generalization", action="store_true", default=False,
+    parser.add_argument("--generalization", action="store_true", default=_d.generalization,
                         help="Stimulus-generalization evaluation")
-    parser.add_argument("--gen-seeds", type=int, nargs="+", default=[123],
-                        help="Seeds for stimulus splits (default: [123])")
+    parser.add_argument("--gen-seeds", type=int, nargs="+", default=_d.gen_seeds,
+                        help="Seeds for stimulus splits")
 
     args = parser.parse_args()
 

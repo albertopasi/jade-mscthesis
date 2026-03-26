@@ -63,9 +63,9 @@ class FTConfig:
     lp_lr: float = 5e-3
     lp_dropout: float = 0.05
     lp_warmup_epochs: int = 3
-    lp_scheduler_patience: int = 5
+    lp_scheduler_patience: int = 6
     lp_early_stop_patience: int = 10
-    lp_grad_clip: float = 100.0
+    lp_grad_clip: float = 2.0
 
     # ── FT stage ───────────────────────────────────────────────────────
     ft_max_epochs: int = 200

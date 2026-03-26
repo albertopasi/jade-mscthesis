@@ -31,17 +31,25 @@ jade-mscthesis/
 │       ├── reve-base/              # HuggingFace REVE model (modeling_reve.py, config.json, ...)
 │       └── reve-positions/         # Position bank for EEG channels
 ├── outputs/
-│   └── lp_checkpoints/             # Saved classifier weights per fold/run
+│   ├── lp_checkpoints/             # Saved LP classifier weights per fold/run
+│   └── ft_checkpoints/             # Saved FT LoRA weights + head + query token per fold/run
 ├── reve_official/                  # Reference only — will be deleted after implementation
 └── src/
     ├── approaches/
-    │   └── linear_probing/
-    │       ├── config.py           # LPConfig dataclass + all paths/hyperparameters
-    │       ├── model.py            # ReveClassifierLP, evaluate_model, EmbeddingExtractor
-    │       ├── train_lp.py         # Main entry point — CLI + training loops
-    │       ├── stable_adamw.py     # Port of official StableAdamW optimizer
-    │       ├── summary.py          # Cross-fold summary printing + JSON export
-    │       └── dataset.py          # EmbeddedDataset (fast mode only)
+    │   ├── shared/
+    │   │   └── summary.py          # Generic cross-fold & cross-seed summary (used by LP + FT)
+    │   ├── linear_probing/
+    │   │   ├── config.py           # LPConfig dataclass + all paths/hyperparameters
+    │   │   ├── model.py            # ReveClassifierLP, evaluate_model, EmbeddingExtractor
+    │   │   ├── train_lp.py         # Main entry point — CLI + training loops
+    │   │   ├── stable_adamw.py     # Port of official StableAdamW optimizer
+    │   │   ├── summary.py          # Thin wrapper around shared summary
+    │   │   └── dataset.py          # EmbeddedDataset (fast mode only)
+    │   └── fine_tuning/
+    │       ├── config.py           # FTConfig dataclass + LoRA/two-stage hyperparameters
+    │       ├── model.py            # ReveClassifierFT
+    │       ├── lora.py             # apply_lora, print_lora_summary (peft LoRA injection)
+    │       └── train_ft.py         # Main entry point — CLI + two-stage training loops
     ├── datasets/
     │   ├── faced_dataset.py        # FACEDWindowDataset
     │   ├── thu_ep_dataset.py       # THUEPWindowDataset (moved from src/thu_ep/)
@@ -148,6 +156,64 @@ uv run python -m src.approaches.linear_probing.train_lp --no-mixup --no-amp
 ### Evaluation strategies
 1. **10-fold cross-subject CV** (default): KFold(n_splits=10, shuffle=True, seed=42)
 2. **Stimulus generalization** (`--generalization`): train on 2/3 stimuli per emotion, validate on held-out 1/3 stimuli + unseen subjects
+
+---
+
+## Fine-Tuning pipeline (LoRA)
+
+Two-stage pipeline faithful to official REVE downstream task:
+1. **LP warmup** — frozen encoder, train `cls_query_token` + linear head (same as LP)
+2. **LoRA FT** — LoRA adapters on encoder attention + head + query token
+
+### Train
+
+```bash
+# All folds, FACED, 9-class
+uv run python -m src.approaches.fine_tuning.train_ft \
+    --dataset faced --task 9-class
+
+# Single fold
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fold 1
+
+# Custom LoRA rank
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --lora-rank 8
+
+# Generalization evaluation
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --generalization
+
+# Smoke test
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fold 1 --lp-epochs 2 --ft-epochs 3
+```
+
+### FT training details
+
+| Setting | LP warmup stage | FT LoRA stage |
+|---|---|---|
+| Optimizer | StableAdamW (betas=0.92/0.999, wd=0.01) | same |
+| LR | 5e-3 | 1e-4 |
+| LR schedule | Exp warmup (3 ep) + ReduceLROnPlateau | Exp warmup (5 ep) + ReduceLROnPlateau |
+| Epochs | 20 max | 200 max |
+| Early stopping | patience=10 (val_acc, `>` threshold) | patience=10 |
+| Scheduler patience | 6 | 6 |
+| Grad clip | max_norm=2.0 | max_norm=2.0 |
+| Dropout | 0.05 | 0.1 |
+| Batch size | 64 | 64 |
+| Precision | AMP float16 | AMP float16 |
+| Augmentation | Mixup | Mixup |
+| Best model metric | val_acc | val_acc |
+
+### LoRA configuration
+- **Targets**: `transformer.layers.{i}.0.to_qkv` and `transformer.layers.{i}.0.to_out` (22 layers)
+- **Default**: rank=16, alpha=16, dropout=0.0
+- **Library**: peft (`LoraConfig` + `get_peft_model`)
+
+### Saved checkpoints
+- LP warmup: saves only trainable params (cls_query_token + head), restores with `strict=False`
+- FT stage: saves full state_dict (LoRA weights + head + query token)
+
+### W&B
+- Project: `eeg-ft-v2`, Entity: `zl-tudelft-thesis`
+- Metrics: `val_acc`, `val_bal_acc`, `val_auroc`, `val_f1`, `val_loss`
 
 ---
 

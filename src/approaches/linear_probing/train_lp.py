@@ -23,6 +23,8 @@ Run with:
 
     # Generalization mode
     uv run python -m src.approaches.linear_probing.train_lp --dataset faced --task binary --generalization
+
+    CUDA_VISIBLE_DEVICES=1 uv run python -m src.approaches.linear_probing.train_lp --dataset faced --task 9-class --pooling last 
 """
 
 from __future__ import annotations
