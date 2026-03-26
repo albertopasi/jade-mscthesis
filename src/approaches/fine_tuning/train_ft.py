@@ -289,17 +289,18 @@ def train_stage(
             f"{current_lr:>10.2e}  ({eta})"
         )
 
-        # W&B per-epoch logging
+        # W&B per-epoch logging (train/ and val/ sections, like LP)
         if wandb.run is not None:
             wandb.log({
-                f"{stage_name}/train_loss": avg_loss,
-                f"{stage_name}/train_acc":  train_acc,
-                f"{stage_name}/val_loss":   metrics.get("val_loss"),
-                f"{stage_name}/val_acc":    val_acc,
-                f"{stage_name}/val_bal_acc": metrics["balanced_acc"],
-                f"{stage_name}/val_auroc":  metrics["auroc"],
-                f"{stage_name}/val_f1":     metrics["f1_weighted"],
-                f"{stage_name}/lr":         current_lr,
+                "train/loss":    avg_loss,
+                "train/acc":     train_acc,
+                "val/loss":      metrics.get("val_loss"),
+                "val/acc":       val_acc,
+                "val/bal_acc":   metrics["balanced_acc"],
+                "val/auroc":     metrics["auroc"],
+                "val/f1":        metrics["f1_weighted"],
+                "lr":            current_lr,
+                "stage":         0 if stage_name == "lp" else 1,
             }, step=wandb_epoch_offset + epoch + 1)
 
         # Early stopping on accuracy

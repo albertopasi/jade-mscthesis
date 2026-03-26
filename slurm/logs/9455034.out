@@ -1,0 +1,13 @@
+=== Experiment on DelftBlue ===
+Job ID:    9455034
+Node:      gpu017
+Partition: gpu-a100
+Module:    src.approaches.fine_tuning.train_ft
+Args:      --dataset faced --task binary
+Started:   Thu Mar 26 14:15:03 CET 2026
+
+=== GPU ===
+NVIDIA A100 80GB PCIe, 81920 MiB
+
+=== Environment ===
+Python:  Python 3.14.3

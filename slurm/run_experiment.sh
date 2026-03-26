@@ -6,16 +6,16 @@
 #
 # Examples:
 #   # FT generalization — pool binary
-#   sbatch slurm/run_experiment.sh src.approaches.lora_finetuning.train_lora \
-#       --task binary --generalization --gen-seeds 123 456 789 101 202
+#   sbatch slurm/run_experiment.sh src.approaches.fine_tuning.train_ft \
+#       --task binary --generalization --gen-seeds 123 456 789
 #
-#   # JADE — pool binary
-#   sbatch slurm/run_experiment.sh src.approaches.jade.train_jade \
-#       --task binary --tau 0.07 --lambda-supcon 0.5
+#   # FT single fold, THU-EP, 9-class
+#   sbatch slurm/run_experiment.sh src.approaches.fine_tuning.train_ft \
+#       --dataset thu-ep --task 9-class --fold 1
 #
-#   # Single fold quick test
-#   sbatch slurm/run_experiment.sh src.approaches.jade.train_jade \
-#       --task binary --fold 1
+#   # LP all folds, FACED, binary
+#   sbatch slurm/run_experiment.sh src.approaches.linear_probing.train_lp \
+#       --dataset faced --task binary
 
 #SBATCH --job-name="eeg-exp"
 #SBATCH --partition=gpu-a100
@@ -54,7 +54,7 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 echo ""
 
 # ── Environment ──────────────────────────────────────────────────────────────
-cd ~/zl-thesis
+cd ~/jade-mscthesis
 
 module load 2024r1
 module load cuda/12.5
