@@ -207,3 +207,58 @@ Despite producing more windows per stimulus (5 vs 3 for a 30 s trial), the 6 s w
 - The **AUROC also drops** (−8.97 pp in 9-class), indicating the 10 s representations are richer not just in argmax accuracy but in their overall separability — the ranking structure degrades, not just the decision boundary.
 
 **Conclusion:** the 10 s window is clearly the better choice. Shorter windows provide a marginal speed benefit but sacrifice substantial emotion-discriminative temporal context. All further experiments should use w=10 s.
+
+---
+
+### 6.3 Pooling Mode: `no` vs `last` (w10s10, cross-subject CV)
+
+The baseline experiments (§2) use `pooling=no`, which concatenates the query token with all channel×patch embeddings and flattens the result into a high-dimensional vector before the linear head. Here we compare against `pooling=last`, which applies query attention and then squeezes the output to a single 512-d vector per sample.
+
+**Head input dimensionality:**
+
+| Pooling | Head input dim | What it contains |
+|---|---|---|
+| `no` | (1 + C×H) × 512 | Full spatial-temporal structure: per-channel, per-patch embeddings + query token |
+| `last` | 512 | Query-attention summary: all spatial-temporal information compressed into a single vector |
+
+Concrete values: FACED → 180,736 vs 512 (354× reduction); THU-EP → 169,472 vs 512 (331× reduction).
+
+**Note on training budget:** the `pool_last` experiments ran with `max_epochs=50` and `patience=10`, whereas the `pool_no` baseline used `max_epochs=20`. This gives `pool_last` a strictly longer training horizon. Despite this advantage, the performance gap is large.
+
+#### Results
+
+| Dataset | Task | `pool_no` (baseline) | `pool_last` | Δ Acc | Δ AUROC |
+|---|---|---|---|---|---|
+| FACED | Binary | 70.57% ± 1.56% | 61.49% ± 2.47% | **−9.08 pp** | −12.64 pp |
+| FACED | 9-class | 48.91% ± 2.86% | 26.91% ± 2.65% | **−22.00 pp** | −15.96 pp |
+| THU-EP | Binary | 65.07% ± 3.31% | 57.37% ± 1.82% | **−7.70 pp** | −14.06 pp |
+| THU-EP | 9-class | 41.06% ± 2.06% | 20.65% ± 1.81% | **−20.41 pp** | −18.43 pp |
+
+Full `pool_last` metrics:
+
+| Dataset | Task | Accuracy | Bal. Accuracy | AUROC | Weighted F1 |
+|---|---|---|---|---|---|
+| FACED | Binary | 61.49% ± 2.47% | 61.49% ± 2.47% | 64.19% ± 2.90% | 61.12% ± 3.10% |
+| FACED | 9-class | 26.91% ± 2.65% | 26.38% ± 2.86% | 68.20% ± 2.91% | 25.35% ± 3.22% |
+| THU-EP | Binary | 57.37% ± 1.82% | 57.35% ± 1.82% | 57.26% ± 2.40% | 56.83% ± 2.63% |
+| THU-EP | 9-class | 20.65% ± 1.81% | 19.78% ± 1.77% | 61.56% ± 1.84% | 17.63% ± 2.06% |
+
+#### Interpretation
+
+The performance drop from `pool_no` to `pool_last` is substantial and consistent across all settings. Three key patterns emerge:
+
+1. **9-class suffers disproportionately.** The accuracy drop is roughly twice as large for 9-class (−20 to −22 pp) compared to binary (−8 to −9 pp). This is consistent with the nature of the information loss: collapsing 32 channels × 11 patches into a single 512-d vector discards fine-grained spatial and temporal patterns. Valence (binary) is a coarse signal that can survive aggressive compression; distinguishing nine emotions requires the spatial-temporal detail that `pool_no` preserves.
+
+2. **AUROC drops substantially too, not just accuracy.** Unlike the AUROC–accuracy dissociation seen in §4.3, here AUROC degrades by 13–18 pp across settings. This means the 512-d query-attention summary does not merely lose decision-boundary precision — it loses representational quality. The ranking structure itself degrades, indicating that the query attention mechanism, while useful, cannot fully compensate for the loss of per-channel, per-patch information when funnelled through a single vector.
+
+3. **The results are still above chance.** FACED 9-class at 26.91% is 2.4× the 11.1% chance level, and AUROC at 68.20% is well above 50%. The query-attention vector captures meaningful emotion-related information — it is simply a much weaker input to a linear classifier than the full concatenated representation.
+
+**Why the gap is so large:**
+
+The `pool_no` mode gives the linear head direct access to every channel's patch-level representation. Each of the 32×11 = 352 spatial-temporal positions contributes its own 512-d feature vector, allowing the linear classifier to learn channel-specific and time-specific weights. This is critical for EEG emotion recognition, where discriminative information is distributed unevenly across brain regions and time — e.g., frontal asymmetry for valence, temporal dynamics for arousal.
+
+The `pool_last` mode forces all this information through the query attention bottleneck. While the `cls_query_token` is trainable and can learn to attend to emotion-relevant positions, the single-vector output cannot represent the full spatial-temporal pattern. In information-theoretic terms, the 512-d vector has ~354× fewer degrees of freedom than the `pool_no` concatenation. For a linear head — which has no capacity to "unmix" compressed features — this is a hard ceiling on what can be recovered.
+
+**Implications for fine-tuning:**
+
+This result motivates why `pool_no` is the default for linear probing. However, the `pool_last` bottleneck may be less detrimental when combined with encoder fine-tuning (LoRA): a fine-tuned encoder can learn to produce a more informative 512-d query-attention summary, whereas in LP the frozen encoder's query attention was never optimised for this downstream task. The `pool_last` mode's compact 512-d input is also more practical for fine-tuning, where `pool_no`'s 180K-d linear head would create a large number of trainable parameters and risk overfitting.
