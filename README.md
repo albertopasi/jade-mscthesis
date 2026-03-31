@@ -24,7 +24,7 @@ The goal is to move beyond subject-specific constraints and build robust models 
 
 * **Python Package Manager:** We use `uv` for lightning-fast dependency management. [Install uv here](https://docs.astral.sh/uv/getting-started/installation/).
 * **Datasets:** You will need to download the raw data for the two supported datasets:
-  * **FACED Dataset:** [Paper Link](https://doi-org.tudelft.idm.oclc.org/10.1038/s41597-023-02650-w) | [Download Link](https://doi-org.tudelft.idm.oclc.org/10.7303/syn50614194)
+  * **FACED Dataset:** [Paper Link](https://doi.org/10.1038/s41597-023-02650-w) | [Download Link](https://doi.org/10.7303/syn50614194)
   * **THU-EP Dataset:** [Paper Link](https://doi.org/10.1016/j.neuroimage.2021.118819) | [Download Link](https://cloud.tsinghua.edu.cn/d/3d176032a5a545c1b927/)
 
 Place the downloaded data in the corresponding folders under `data/FACED/` and `data/thu ep/`.
