@@ -129,7 +129,7 @@ jade-mscthesis/
 │   │   └── fine_tuning/    # FT logic, LoRA injection, two-stage training loops
 │   ├── datasets/           # PyTorch Dataset classes and cross-validation folding logic
 │   ├── preprocessing/      # Scripts to transform raw EEG data to clean .npy tensors
-│   ├── exploration/        # Jupyter notebooks / scripts for initial data exploration
+│   ├── exploration/        # scripts for initial data exploration and visualization
 │   └── utils/              # General utilities, PyTorch Lightning callbacks
 └── src/download_reve/      # Script to download HF REVE models
 ```
