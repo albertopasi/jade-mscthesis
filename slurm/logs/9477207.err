@@ -1,0 +1,369 @@
+[rank: 0] Seed set to 42
+`torch_dtype` is deprecated! Use `dtype` instead!
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_142314-u7gsrsj8
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄██████████████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁██████████████████
+wandb:        train/acc ▁▁▁▂▂▃▄▅▅▆▆▆▆▇▇▇▇▇████████████████████
+wandb:       train/loss ▂▃█▆▃▃▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▁▂▁▃▄▄▅▄▆▅▆▆▇▆▇▇▇▇▆██████████████████
+wandb:        val/auroc ▁▁▁▃▅▆▆▆▆▇▇▇▆▇▇▇▇▆▇▇▇█████████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.55495
+wandb:   best/val_auroc 0.85897
+wandb: best/val_bal_acc 0.55579
+wandb:      best/val_f1 0.55815
+wandb:               lr 5e-05
+wandb:            stage 1
+wandb:        train/acc 0.99632
+wandb:       train/loss 0.02375
+wandb:          val/acc 0.54487
+wandb:        val/auroc 0.86095
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_142314-u7gsrsj8
+wandb: Find logs at: ./wandb/offline-run-20260330_142314-u7gsrsj8/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_143537-0ycc00f8
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄█████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁█████████████████████████████
+wandb:        train/acc ▁▁▁▁▃▅▅▆▆▆▇▇▇██▇████████████████████████
+wandb:       train/loss ▂▄██▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▁▂▃▆▆▅▆▇▆▇▆▇▇▇▇████████████████████████
+wandb:        val/auroc ▁▃▅▆▇▇▆▇▇▇▇▇▇▇▇█████████████████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.5293
+wandb:   best/val_auroc 0.85855
+wandb: best/val_bal_acc 0.5311
+wandb:      best/val_f1 0.53053
+wandb:               lr 5e-05
+wandb:            stage 1
+wandb:        train/acc 0.99881
+wandb:       train/loss 0.00666
+wandb:          val/acc 0.52106
+wandb:        val/auroc 0.86055
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_143537-0ycc00f8
+wandb: Find logs at: ./wandb/offline-run-20260330_143537-0ycc00f8/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_150126-vrmiys81
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄█████████████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█████████████████████
+wandb:        train/acc ▁▁▁▂▃▄▅▅▆▆▇▇▇▇▇██▇█▇████████████████████
+wandb:       train/loss ▂▄▇█▄▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▂▂▃▃▅▆▄▇▆▆▇▆▇▇▇█▇▇▇████████████████████
+wandb:        val/auroc ▁▁▂▄▄▆▇▇▇▇▇▇▇▇█▇█▇▇▇▇▇██████████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.46795
+wandb:   best/val_auroc 0.80644
+wandb: best/val_bal_acc 0.46296
+wandb:      best/val_f1 0.46747
+wandb:               lr 5e-05
+wandb:            stage 1
+wandb:        train/acc 0.99773
+wandb:       train/loss 0.02089
+wandb:          val/acc 0.46062
+wandb:        val/auroc 0.81041
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_150126-vrmiys81
+wandb: Find logs at: ./wandb/offline-run-20260330_150126-vrmiys81/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_151743-gn823371
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr █████████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁██████████████████████████
+wandb:        train/acc ▁▁▁▂▄▇▆▇▇▇██▆███████████████████████████
+wandb:       train/loss ▃█▃▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▂▁▅▅▆▆▆▇▆▇▆▇▆▇█▇█████▇█████████████████
+wandb:        val/auroc ▂▁▅▆▇▇▇▇▇▇█▇▇███████████████████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.54762
+wandb:   best/val_auroc 0.866
+wandb: best/val_bal_acc 0.5481
+wandb:      best/val_f1 0.54989
+wandb:               lr 1e-05
+wandb:            stage 1
+wandb:        train/acc 0.99914
+wandb:       train/loss 0.00605
+wandb:          val/acc 0.54067
+wandb:        val/auroc 0.86593
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_151743-gn823371
+wandb: Find logs at: ./wandb/offline-run-20260330_151743-gn823371/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_154524-b4x37qt3
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄█████████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█████████████████████████
+wandb:        train/acc ▁▁▁▂▃▅▅▆▇▇▇▇▇▇▇▇████████████████████████
+wandb:       train/loss ▂▃█▆▃▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▃▂▄▆▅▅▆▇▅▇▆▇▇▆▇▇▇▇▇████████████████████
+wandb:        val/auroc ▂▂▁▄▆▆▆▇▇▆▇▇▇▇▇▇▇▆▇▇▇███████████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.49504
+wandb:   best/val_auroc 0.85097
+wandb: best/val_bal_acc 0.49331
+wandb:      best/val_f1 0.49733
+wandb:               lr 2e-05
+wandb:            stage 1
+wandb:        train/acc 0.99818
+wandb:       train/loss 0.01108
+wandb:          val/acc 0.48214
+wandb:        val/auroc 0.84871
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_154524-b4x37qt3
+wandb: Find logs at: ./wandb/offline-run-20260330_154524-b4x37qt3/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_160414-nderfg38
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄██████████████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁████████████████
+wandb:        train/acc ▁▁▁▂▃▄▅▅▆▆▇▇▇▇▇█▇███▆███████████████
+wandb:       train/loss ▂▃█▆▃▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▁▁▃▄▄▇▇▇▆▆▇▇▇▇▇▇█▇█▇▇▇███▇█████████
+wandb:        val/auroc ▄▃▁▅▆▆███▇▇█▇▇█▇▇███▇▇▇█████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.55159
+wandb:   best/val_auroc 0.87229
+wandb: best/val_bal_acc 0.55941
+wandb:      best/val_f1 0.54513
+wandb:               lr 0.0001
+wandb:            stage 1
+wandb:        train/acc 0.997
+wandb:       train/loss 0.02351
+wandb:          val/acc 0.54266
+wandb:        val/auroc 0.87563
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_160414-nderfg38
+wandb: Find logs at: ./wandb/offline-run-20260330_160414-nderfg38/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_161636-b1kwbl38
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄██████████████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█████████████████
+wandb:        train/acc ▁▁▁▂▃▄▅▆▆▆▆▇▇▇▇█████▆████████████████
+wandb:       train/loss ▁▃█▆▃▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▁▂▄▃▆▆▆▅▆▆▆▆▇▇▇▇▇█▇▇▇██▇████████████
+wandb:        val/auroc ▃▁▃▅▄▇▇▇▇▇▇▇▇█▇▇▇▇██▇▇▇██████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.58234
+wandb:   best/val_auroc 0.8782
+wandb: best/val_bal_acc 0.58153
+wandb:      best/val_f1 0.58362
+wandb:               lr 5e-05
+wandb:            stage 1
+wandb:        train/acc 0.99657
+wandb:       train/loss 0.03482
+wandb:          val/acc 0.57738
+wandb:        val/auroc 0.88132
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_161636-b1kwbl38
+wandb: Find logs at: ./wandb/offline-run-20260330_161636-b1kwbl38/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_162922-haqnqdq2
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄███████████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁███████████████████████
+wandb:        train/acc ▁▁▁▂▃▄▆▆▆▇▇▇▇▇▇██▅▇█████████████████████
+wandb:       train/loss ▂▄██▄▂▂▂▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▁▃▃▅▅▆▆▇▇▆▇▇▆▇▇▇▆▇██▇██▇███████████████
+wandb:        val/auroc ▃▃▁▄▇▇▇▇▇▇▇▇▇▇█▇▇▆▇█████████████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.56746
+wandb:   best/val_auroc 0.88071
+wandb: best/val_bal_acc 0.56764
+wandb:      best/val_f1 0.56327
+wandb:               lr 2e-05
+wandb:            stage 1
+wandb:        train/acc 0.99732
+wandb:       train/loss 0.0185
+wandb:          val/acc 0.55754
+wandb:        val/auroc 0.88018
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_162922-haqnqdq2
+wandb: Find logs at: ./wandb/offline-run-20260330_162922-haqnqdq2/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_164658-ivpa7ykz
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄████████▄▄▄▄▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█████████████████████████
+wandb:        train/acc ▁▁▂▃▄▆▆▆▇▇▇▇███▇████████████████████████
+wandb:       train/loss ▂▄█▅▃▂▂▁▁▁▁▁▁▁▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▂▂▃▅▆▇▇▆▆▇▇▆█▇▇▇▇████████▇█████████████
+wandb:        val/auroc ▁▂▂▇▇▇▆▇▆█▇███▅▇▇▇██████████████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.5
+wandb:   best/val_auroc 0.81107
+wandb: best/val_bal_acc 0.50592
+wandb:      best/val_f1 0.49974
+wandb:               lr 5e-05
+wandb:            stage 1
+wandb:        train/acc 1
+wandb:       train/loss 1e-05
+wandb:          val/acc 0.5
+wandb:        val/auroc 0.81132
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_164658-ivpa7ykz
+wandb: Find logs at: ./wandb/offline-run-20260330_164658-ivpa7ykz/logs
+wandb: Tracking run with wandb version 0.25.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_170757-6o788vx6
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/mapping_func.py:72: UserWarning: You are trying to modify a model with PEFT for a second time. If you want to reload the model with a different config, make sure to call `.unload()` before.
+  warnings.warn(
+/home/apasinato/jade-mscthesis/.venv/lib/python3.14/site-packages/peft/tuners/tuners_utils.py:285: UserWarning: Already found a `peft_config` attribute in the model. This will lead to having multiple adapters in the model. Make sure to know what you are doing!
+  warnings.warn(
+wandb: 
+wandb: Run history:
+wandb:     best/val_acc ▁
+wandb:   best/val_auroc ▁
+wandb: best/val_bal_acc ▁
+wandb:      best/val_f1 ▁
+wandb:               lr ▂▄██████████████████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:            stage ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁████████████████████
+wandb:        train/acc ▁▁▁▂▃▄▅▆▆▇▇▇▇▇▇▇▇███▇███████████████████
+wandb:       train/loss ▂▃█▆▃▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:          val/acc ▁▁▂▁▅▆▆▆▇▇▇▆▆▇▆▆▇▇▇▇▇▇██████████▇███████
+wandb:        val/auroc ▂▁▁▄▇▇▇▇▇▇█▇▇▇▇▇▇▇██▆▇██████████████████
+wandb:               +3 ...
+wandb: 
+wandb: Run summary:
+wandb:     best/val_acc 0.56548
+wandb:   best/val_auroc 0.87793
+wandb: best/val_bal_acc 0.56687
+wandb:      best/val_f1 0.56537
+wandb:               lr 5e-05
+wandb:            stage 1
+wandb:        train/acc 0.99657
+wandb:       train/loss 0.02635
+wandb:          val/acc 0.55952
+wandb:        val/auroc 0.87589
+wandb:               +3 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /home/apasinato/jade-mscthesis/wandb/offline-run-20260330_170757-6o788vx6
+wandb: Find logs at: ./wandb/offline-run-20260330_170757-6o788vx6/logs

@@ -1,0 +1,22 @@
+=== Experiment on DelftBlue ===
+Job ID:    9477296
+Node:      gpu013
+Partition: gpu-a100
+Module:    src.approaches.fine_tuning.train_ft
+Args:      --dataset faced --task 9-class --pooling last --no-mixup
+Started:   Mon Mar 30 15:20:28 CEST 2026
+
+=== GPU ===
+NVIDIA A100 80GB PCIe, 81920 MiB
+
+=== Environment ===
+Python:  Python 3.14.3
+PyTorch: 2.9.1+cu128
+CUDA:    True 12.8
+
+=== Running: python -m src.approaches.fine_tuning.train_ft --dataset faced --task 9-class --pooling last --no-mixup ===
+
+
+=== Complete ===
+Exit code: 1
+Finished:  Mon Mar 30 15:22:28 CEST 2026
