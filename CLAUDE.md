@@ -37,18 +37,27 @@ jade-mscthesis/
 └── src/
     ├── approaches/
     │   ├── shared/
-    │   │   └── summary.py          # Generic cross-fold & cross-seed summary (used by LP + FT)
+    │   │   ├── config.py           # PROJECT_ROOT, DATA_ROOTS, REVE paths, SAMPLING_RATE, DEVICE, NUM_WORKERS, DATASET_DEFAULTS
+    │   │   ├── stable_adamw.py     # StableAdamW optimizer (used by LP + FT)
+    │   │   ├── training_utils.py   # fmt_dur, COL_W, _get_exponential_warmup_lambda
+    │   │   ├── metrics.py          # evaluate_model (accuracy, balanced_acc, AUROC, F1)
+    │   │   ├── model_utils.py      # RMSNorm, compute_n_patches
+    │   │   ├── dataset.py          # build_raw_dataset (duck-typed cfg, works for LP + FT)
+    │   │   ├── reve.py             # load_reve_and_positions, get_channel_names
+    │   │   └── summary.py          # print_fold_summary, print_cross_seed_summary (generic)
     │   ├── linear_probing/
-    │   │   ├── config.py           # LPConfig dataclass + all paths/hyperparameters
-    │   │   ├── model.py            # ReveClassifierLP, evaluate_model, EmbeddingExtractor
+    │   │   ├── config.py           # LPConfig dataclass + LP-specific paths/hyperparameters
+    │   │   ├── model.py            # ReveClassifierLP, EmbeddingExtractor, LinearProber (evaluate_model → shared/metrics.py)
     │   │   ├── train_lp.py         # Main entry point — CLI + training loops
-    │   │   ├── stable_adamw.py     # Port of official StableAdamW optimizer
-    │   │   ├── summary.py          # Thin wrapper around shared summary
+    │   │   ├── stable_adamw.py     # Legacy file (kept for reference, unused — shared/ is canonical)
+    │   │   ├── summary.py          # Thin wrapper around shared summary for LP
     │   │   └── dataset.py          # EmbeddedDataset (fast mode only)
     │   └── fine_tuning/
     │       ├── config.py           # FTConfig dataclass + LoRA/two-stage hyperparameters
     │       ├── model.py            # ReveClassifierFT
     │       ├── lora.py             # apply_lora, print_lora_summary (peft LoRA injection)
+    │       ├── training.py         # train_stage() — shared loop for LP warmup + FT stages
+    │       ├── summary.py          # Thin wrapper around shared summary for FT
     │       └── train_ft.py         # Main entry point — CLI + two-stage training loops
     ├── datasets/
     │   ├── faced_dataset.py        # FACEDWindowDataset
@@ -168,7 +177,7 @@ Two-stage pipeline faithful to official REVE downstream task:
 ### Train
 
 ```bash
-# All folds, FACED, 9-class
+# All folds, FACED, 9-class (LoRA, default)
 uv run python -m src.approaches.fine_tuning.train_ft \
     --dataset faced --task 9-class
 
@@ -178,6 +187,13 @@ uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fold 1
 # Custom LoRA rank
 uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --lora-rank 8
 
+# Full fine-tuning (no LoRA — unfreezes entire encoder in stage 2)
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fullft
+
+# Official REVE static split: train 0-79, val 80-99, test 100-122 (FACED only)
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --revesplit
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fullft --revesplit
+
 # Generalization evaluation
 uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --generalization
 
@@ -185,15 +201,20 @@ uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --generaliz
 uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fold 1 --lp-epochs 2 --ft-epochs 3
 ```
 
+### Evaluation modes (mutually exclusive)
+1. **10-fold cross-subject CV** (default): saves `summary_*.json` via `print_fold_summary`
+2. **Static split** (`--revesplit`, FACED only): single run, train/val/test fixed by subject ID range, saves `summary_*_revesplit.json`
+3. **Stimulus generalization** (`--generalization`): same k-fold subjects but 2/3 stimuli for train, 1/3 held-out
+
 ### FT training details
 
-| Setting | LP warmup stage | FT LoRA stage |
+| Setting | LP warmup stage | FT LoRA / full-FT stage |
 |---|---|---|
 | Optimizer | StableAdamW (betas=0.92/0.999, wd=0.01) | same |
 | LR | 5e-3 | 1e-4 |
 | LR schedule | Exp warmup (3 ep) + ReduceLROnPlateau | Exp warmup (5 ep) + ReduceLROnPlateau |
 | Epochs | 20 max | 200 max |
-| Early stopping | patience=10 (val_acc, `>` threshold) | patience=10 |
+| Early stopping | patience=10 (val_acc, `>` threshold) | patience=20 |
 | Scheduler patience | 6 | 6 |
 | Grad clip | max_norm=2.0 | max_norm=2.0 |
 | Dropout | 0.05 | 0.1 |
@@ -209,7 +230,8 @@ uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fold 1 --
 
 ### Saved checkpoints
 - LP warmup: saves only trainable params (cls_query_token + head), restores with `strict=False`
-- FT stage: saves full state_dict (LoRA weights + head + query token)
+- FT stage (LoRA): saves `lora_adapter/` (peft convention) + `head_weights.pt` separately
+- FT stage (full FT): saves single `full_model.pt` with complete state dict
 
 ### W&B
 - Project: `eeg-ft-v2`, Entity: `zl-tudelft-thesis`

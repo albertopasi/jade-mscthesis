@@ -54,32 +54,20 @@ from src.datasets.folds import (
 )
 
 from src.approaches.linear_probing.model import (
-    ReveClassifierLP, EmbeddingExtractor, LinearProber,
-    load_reve_and_positions, evaluate_model,
+    ReveClassifierLP, EmbeddingExtractor, LinearProber, evaluate_model,
 )
+from src.approaches.shared.reve import load_reve_and_positions, get_channel_names
 from src.approaches.linear_probing.config import (
     LPConfig, OUTPUT_DIR,
     USE_WANDB, WANDB_PROJECT, WANDB_ENTITY,
     SAMPLING_RATE, DEVICE, ACCELERATOR, NUM_WORKERS,
 )
-from src.approaches.linear_probing.stable_adamw import StableAdamW
+from src.approaches.shared.stable_adamw import StableAdamW
+from src.approaches.shared.training_utils import fmt_dur, COL_W, _get_exponential_warmup_lambda
+from src.approaches.shared.dataset import build_raw_dataset
 from src.approaches.linear_probing.summary import (
     print_fold_summary, print_cross_seed_summary,
 )
-
-
-# ── Formatting helpers ────────────────────────────────────────────────────────
-
-COL_W = 105
-
-def fmt_dur(seconds: float) -> str:
-    h, rem = divmod(int(seconds), 3600)
-    m, s   = divmod(rem, 60)
-    if h > 0:
-        return f"{h}h{m:02d}m{s:02d}s"
-    if m > 0:
-        return f"{m}m{s:02d}s"
-    return f"{s}s"
 
 
 def fmt_metric(val: float, decimals: int = 4) -> str:
@@ -87,48 +75,6 @@ def fmt_metric(val: float, decimals: int = 4) -> str:
     if math.isnan(val):
         return "n/a"
     return f"{val:.{decimals}f}"
-
-
-# ── Dataset factory ──────────────────────────────────────────────────────────
-
-def get_channel_names(dataset: str) -> list[str]:
-    """Return electrode channel names for the specified dataset."""
-    if dataset == "faced":
-        from src.datasets.faced_dataset import FACED_CHANNELS
-        return FACED_CHANNELS
-    else:
-        from src.preprocessing.thu_ep.config import THUEPConfig
-        return THUEPConfig().final_channels
-
-
-def build_raw_dataset(
-    cfg: LPConfig,
-    subject_ids: list[int],
-    stimulus_filter: set[int] | None = None,
-):
-    """Build a raw EEG window dataset for the specified dataset."""
-    if cfg.dataset == "faced":
-        from src.datasets.faced_dataset import FACEDWindowDataset
-        return FACEDWindowDataset(
-            subject_ids=subject_ids,
-            task_mode=cfg.task_mode,
-            data_root=cfg.data_root,
-            window_size=cfg.window_size,
-            stride=cfg.stride,
-            scale_factor=cfg.scale_factor,
-            stimulus_filter=stimulus_filter,
-        )
-    else:
-        from src.datasets.thu_ep_dataset import THUEPWindowDataset
-        return THUEPWindowDataset(
-            subject_ids=subject_ids,
-            task_mode=cfg.task_mode,
-            data_root=cfg.data_root,
-            window_size=cfg.window_size,
-            stride=cfg.stride,
-            scale_factor=cfg.scale_factor,
-            stimulus_filter=stimulus_filter,
-        )
 
 
 # ── Patience monitor ─────────────────────────────────────
@@ -149,17 +95,6 @@ class PatienceMonitor:
         else:
             self.counter += 1
             return self.counter >= self.patience
-
-
-# ── Exponential warmup ────────────────────────────────────
-
-def _get_exponential_warmup_lambda(total_steps: int):
-    """Exponential warmup schedule."""
-    def fn(step: int) -> float:
-        if step >= total_steps or total_steps == 0:
-            return 1.0
-        return min(1.0, (10 ** (step / total_steps) - 1) / 9)
-    return fn
 
 
 # ── Official-mode training loop ──────────────────────────────────────────────

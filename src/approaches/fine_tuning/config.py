@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.approaches.linear_probing.config import (
+from src.approaches.shared.config import (
     DATA_ROOTS,
     DATASET_DEFAULTS,
     DEVICE,
@@ -73,7 +73,7 @@ class FTConfig:
     ft_dropout: float = 0.1
     ft_warmup_epochs: int = 5
     ft_scheduler_patience: int = 6
-    ft_early_stop_patience: int = 10
+    ft_early_stop_patience: int = 20
     ft_grad_clip: float = 2.0
 
     # ── LoRA ───────────────────────────────────────────────────────────
@@ -81,6 +81,10 @@ class FTConfig:
     lora_alpha: int = 16          # match rank (official default)
     lora_dropout: float = 0.0     # official uses no LoRA dropout
     lora_target: str = "attention"  # "attention" only for now
+
+    # ── Optional mode flags ───────────────────────────────────────────
+    full_ft: bool = False          # True → full fine-tuning (no LoRA)
+    reve_split: bool = False       # True → fixed train/val/test (FACED only)
 
     # ── Derived helpers ────────────────────────────────────────────────
 
@@ -110,12 +114,22 @@ class FTConfig:
     def mixup_tag(self) -> str:
         return "" if self.use_mixup else "_nomixup"
 
+    @property
+    def _mode_tags(self) -> str:
+        """Append '_fullft' and/or '_revesplit' labels when active."""
+        tags = ""
+        if self.full_ft:
+            tags += "_fullft"
+        if self.reve_split:
+            tags += "_revesplit"
+        return tags
+
     def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
         gen = f"_gen_s{gen_seed}" if gen_seed is not None else ""
         return (
             f"ft_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}{self.mixup_tag}{gen}_fold_{fold_idx}"
+            f"r{self.lora_rank}{self.mixup_tag}{self._mode_tags}{gen}_fold_{fold_idx}"
         )
 
     def group_name(self) -> str:
@@ -123,7 +137,7 @@ class FTConfig:
         return (
             f"ft_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}{self.mixup_tag}{gen}"
+            f"r{self.lora_rank}{self.mixup_tag}{self._mode_tags}{gen}"
         )
 
     def hparams_dict(
@@ -157,6 +171,8 @@ class FTConfig:
             "use_mixup":             self.use_mixup,
             "use_amp":               self.use_amp,
             "scale_factor":          self.scale_factor,
+            "full_ft":               self.full_ft,
+            "reve_split":            self.reve_split,
             # LP stage
             "lp_max_epochs":         self.lp_max_epochs,
             "lp_lr":                 self.lp_lr,

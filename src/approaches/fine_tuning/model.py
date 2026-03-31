@@ -14,7 +14,7 @@ import torch.nn as nn
 from einops import rearrange
 from torch import Tensor
 
-from src.approaches.linear_probing.model import RMSNorm, compute_n_patches
+from src.approaches.shared.model_utils import RMSNorm, compute_n_patches
 
 
 class ReveClassifierFT(nn.Module):
@@ -43,13 +43,13 @@ class ReveClassifierFT(nn.Module):
 
         self.pooling = pooling
         self.reve = reve_model
-        self.embed_dim = reve_model.config.embed_dim  # 512
+        self.embed_dim = reve_model.config.embed_dim  # 512 (Base)
 
         # Register electrode positions as buffer
         self.register_buffer("pos_tensor", pos_tensor)  # (n_channels, 3)
 
-        # Trainable query token — fresh random init
-        self.cls_query_token = nn.Parameter(torch.randn(1, 1, self.embed_dim))
+        # Trainable query token — initialised from pretrained checkpoint (matches official)
+        self.cls_query_token = nn.Parameter(reve_model.cls_query_token.data.clone())
 
         # Compute dimensions
         n_patches = compute_n_patches(window_size)

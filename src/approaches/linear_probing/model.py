@@ -19,83 +19,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
-from sklearn.metrics import (
-    accuracy_score,
-    balanced_accuracy_score,
-
-    f1_score,
-    roc_auc_score,
-    average_precision_score,
-)
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from transformers import AutoModel
-
-from src.approaches.linear_probing.config import LPConfig, REVE_MODEL_PATH, REVE_POS_PATH
-
-
-# ── RMSNorm ──────────────────────────────────────────────────────────────────
-
-class RMSNorm(nn.Module):
-    """Root Mean Square Layer Normalization (matching REVE backbone's RMSNorm)."""
-
-    def __init__(self, dim: int, eps: float = 1e-8) -> None:
-        super().__init__()
-        self.scale = nn.Parameter(torch.ones(dim))
-        self.eps = eps
-
-    def forward(self, x: Tensor) -> Tensor:
-        rms = torch.sqrt(torch.mean(x ** 2, dim=-1, keepdim=True) + self.eps)
-        return (x / rms) * self.scale
-
-
-# ── Helper: load REVE model and position bank ────────────────────────────────
-
-def load_reve_and_positions(
-    channel_names: list[str],
-    device: str = "cuda",
-    reve_model_path: Path = REVE_MODEL_PATH,
-    reve_pos_path: Path = REVE_POS_PATH,
-) -> Tuple[nn.Module, Tensor]:
-    """Load frozen REVE encoder and compute electrode position tensor.
-
-    Returns:
-        reve_model: The pretrained REVE model (eval mode, all params frozen).
-        pos_tensor: Electrode positions, shape (n_channels, 3).
-    """
-    print("Loading REVE model from local path …")
-    reve_model = AutoModel.from_pretrained(
-        str(reve_model_path), trust_remote_code=True, torch_dtype="auto",
-    )
-    reve_model.eval()
-    reve_model.to(device)
-    for param in reve_model.parameters():
-        param.requires_grad_(False)
-
-    print("Loading REVE position bank from local path …")
-    pos_bank = AutoModel.from_pretrained(
-        str(reve_pos_path), trust_remote_code=True, torch_dtype="auto",
-    )
-    pos_bank.eval()
-    pos_bank.to(device)
-
-    with torch.no_grad():
-        pos_tensor = pos_bank(channel_names)  # (n_channels, 3)
-    print(f"  Electrode positions cached for {len(channel_names)} channels.")
-
-    # Free position bank memory
-    del pos_bank
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-
-    return reve_model, pos_tensor
-
-
-def compute_n_patches(window_size: int, patch_size: int = 200, overlap: int = 20) -> int:
-    """Compute number of time patches from REVE's unfold parameters."""
-    step = patch_size - overlap
-    return (window_size - patch_size) // step + 1
+from src.approaches.linear_probing.config import LPConfig
+from src.approaches.shared.model_utils import RMSNorm, compute_n_patches
+from src.approaches.shared.metrics import evaluate_model
 
 
 # ── ReveClassifierLP ────────────────────────────────
@@ -137,8 +66,8 @@ class ReveClassifierLP(nn.Module):
         # Register electrode positions as buffer (not a parameter)
         self.register_buffer("pos_tensor", pos_tensor)  # (n_channels, 3)
 
-        # Trainable query token — fresh random init
-        self.cls_query_token = nn.Parameter(torch.randn(1, 1, self.embed_dim))
+        # Trainable query token — initialised from pretrained checkpoint (matches official)
+        self.cls_query_token = nn.Parameter(reve_model.cls_query_token.data.clone())
 
         self.dropout = nn.Dropout(dropout)
 
@@ -219,77 +148,6 @@ class ReveClassifierLP(nn.Module):
     def n_trainable_params(self) -> int:
         return sum(p.numel() for p in self.trainable_parameters())
 
-
-# ── Evaluation helper ────────────────────────────────────────────────────────
-
-@torch.no_grad()
-def evaluate_model(
-    model: nn.Module,
-    loader: DataLoader,
-    device: str = "cuda",
-    n_classes: int = 9,
-    use_amp: bool = True,
-) -> dict:
-    """Evaluate model on a dataloader, returning official REVE metrics.
-
-    Returns dict with keys: accuracy, balanced_acc, f1_weighted,
-    auroc (binary only), auc_pr (binary only).
-    """
-    model.eval()
-    device_type = "cuda" if "cuda" in device else "cpu"
-    binary = n_classes == 2
-
-    all_preds, all_targets, all_probs = [], [], []
-    score, count = 0, 0
-    total_loss = 0.0
-
-    for batch in loader:
-        eeg, target = batch[0].to(device), batch[1].long().to(device)
-
-        with torch.autocast(device_type=device_type, enabled=use_amp, dtype=torch.float16):
-            with torch.inference_mode():
-                output = model(eeg)
-
-        loss = F.cross_entropy(output.float(), target)
-        total_loss += loss.item() * target.shape[0]
-
-        decisions = torch.argmax(output, dim=1)
-        score += (decisions == target).int().sum().item()
-        count += target.shape[0]
-
-        all_preds.append(decisions.cpu())
-        all_targets.append(target.cpu())
-        all_probs.append(output.float().cpu())
-
-    gt = torch.cat(all_targets).numpy()
-    pr = torch.cat(all_preds).numpy()
-    pr_probs = torch.cat(all_probs).numpy()
-
-    acc = score / count
-    avg_loss = total_loss / max(count, 1)
-    bal_acc = balanced_accuracy_score(gt, pr)
-    f1_w = f1_score(gt, pr, average="weighted")
-
-    metrics = {
-        "accuracy": acc,
-        "val_loss": avg_loss,
-        "balanced_acc": bal_acc,
-        "f1_weighted": f1_w,
-        "auroc": 0.0,
-        "auc_pr": 0.0,
-    }
-
-    try:
-        probs_softmax = torch.softmax(torch.from_numpy(pr_probs), dim=-1).numpy()
-        if binary:
-            metrics["auroc"] = roc_auc_score(gt, probs_softmax[:, 1])
-            metrics["auc_pr"] = average_precision_score(gt, probs_softmax[:, 1])
-        else:
-            metrics["auroc"] = roc_auc_score(gt, probs_softmax, multi_class="ovr", average="macro")
-    except ValueError:
-        pass  # too few classes in fold (e.g. single-class val split)
-
-    return metrics
 
 
 # ── EmbeddingExtractor (fast mode) ──────────────────────────────────────────

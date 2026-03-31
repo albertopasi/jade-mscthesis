@@ -19,11 +19,11 @@ Frozen REVE encoder + trainable `cls_query_token` + trainable linear head.
 
 | File | Description |
 |---|---|
-| `config.py` | `LPConfig` dataclass — all paths, hyperparameters, derived helpers |
+| `config.py` | `LPConfig` dataclass — LP-specific paths and hyperparameters (shared constants from `shared/config.py`) |
 | `model.py` | `ReveClassifierLP` (official mode), `EmbeddingExtractor`, `LinearProber` (fast mode) |
 | `train_lp.py` | Main entry point — CLI, training loops, fold orchestration |
-| `stable_adamw.py` | Port of official `StableAdamW` optimizer (debiased betas, RMS-stabilized LR) |
-| `summary.py` | Cross-fold summary printing and JSON export |
+| `summary.py` | Thin wrapper around `shared/summary.py` for LP-specific filenames |
+| `dataset.py` | `EmbeddedDataset` — fast mode only (pre-computed embeddings) |
 
 ---
 

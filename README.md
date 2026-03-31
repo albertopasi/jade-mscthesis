@@ -83,21 +83,27 @@ uv run python -m src.approaches.linear_probing.train_lp --dataset thu-ep --task 
 uv run python -m src.approaches.linear_probing.train_lp --dataset faced --task binary --window 6 --stride 6
 ```
 
-### 🎛️ Fine-Tuning (FT) with LoRA
+### 🎛️ Fine-Tuning (FT)
 
-The fine-tuning pipeline is a two-stage process: an LP warmup stage, followed by LoRA adapter training on the encoder attention layers.
+Two-stage pipeline: LP warmup (frozen encoder, trains query token + head), then LoRA adapter training on the encoder attention layers. Optionally, the full encoder can be unfrozen instead of LoRA (`--fullft`).
 
-**Example: All folds, FACED dataset, 9-class task**
+**Example: All folds, FACED dataset, 9-class task (LoRA, default)**
 ```bash
 uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --task 9-class
 ```
 
-**Example: Single fold evaluation**
+**Example: Full fine-tuning (no LoRA)**
 ```bash
-uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fold 1
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fullft
 ```
 
-**Example: Custom LoRA Rank**
+**Example: Official REVE static split with held-out test evaluation (FACED only)**
+```bash
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --revesplit
+uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fullft --revesplit
+```
+
+**Example: Custom LoRA rank**
 ```bash
 uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --lora-rank 8
 ```
@@ -118,9 +124,9 @@ jade-mscthesis/
 ├── outputs/                # Checkpoints (LP and FT) saved per fold/run
 ├── src/                    # Main source code directory
 │   ├── approaches/         # Training algorithms
-│   │   ├── shared/         # Shared utilities (summaries, metrics)
+│   │   ├── shared/         # Shared utilities (config, model blocks, metrics, optimizer, dataset factory)
 │   │   ├── linear_probing/ # LP logic, models, and training loops
-│   │   └── fine_tuning/    # FT logic, LoRA injection, and training loops
+│   │   └── fine_tuning/    # FT logic, LoRA injection, two-stage training loops
 │   ├── datasets/           # PyTorch Dataset classes and cross-validation folding logic
 │   ├── preprocessing/      # Scripts to transform raw EEG data to clean .npy tensors
 │   ├── exploration/        # Jupyter notebooks / scripts for initial data exploration

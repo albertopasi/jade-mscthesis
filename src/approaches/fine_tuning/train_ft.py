@@ -1,12 +1,18 @@
 """
-train_ft.py — Main execution script for Fine-Tuning with LoRA.
+train_ft.py — Main execution script for Fine-Tuning (LoRA or full FT).
 
 Two-stage pipeline:
   Stage 1 (LP warmup): frozen encoder, train cls_query_token + linear head.
-  Stage 2 (FT):        LoRA adapters on encoder, train LoRA + head + query token.
+  Stage 2 (FT):        LoRA adapters on encoder (default), or full encoder unfreeze (--fullft).
+
+Evaluation modes (mutually exclusive):
+  Default:          10-fold cross-subject CV → saves summary_*.json
+  --revesplit:      Official REVE static split (FACED only) → train 0-79 / val 80-99 / test 100-122
+                    Single run, saves summary_*_revesplit.json with val + test metrics.
+  --generalization: 2/3 stimuli per emotion for train, 1/3 held-out (applied across all folds).
 
 Run with:
-    # All folds, FACED, 9-class
+    # All folds, FACED, 9-class (LoRA, default)
     uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --task 9-class
 
     # Single fold
@@ -15,6 +21,16 @@ Run with:
     # Custom LoRA rank
     uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --lora-rank 8
 
+    # Full fine-tuning (no LoRA — unfreezes entire encoder in stage 2)
+    uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fullft
+
+    # Official REVE static split with held-out test evaluation
+    uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --revesplit
+    uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fullft --revesplit
+
+    # Generalization evaluation
+    uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --generalization
+
     # Smoke test (few epochs)
     uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fold 1 --lp-epochs 2 --ft-epochs 3
 """
@@ -22,8 +38,10 @@ Run with:
 from __future__ import annotations
 
 import argparse
+import copy
+import datetime
 import gc
-import random
+import json
 import statistics
 import sys
 import time
@@ -34,41 +52,18 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import torch
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import wandb
 
 from src.datasets.folds import (
-    get_all_subjects, get_kfold_splits, get_stimulus_generalization_split, N_FOLDS,
+    get_all_subjects, get_kfold_splits, get_stimulus_generalization_split,
+    get_official_split, N_FOLDS,
 )
 
-from src.approaches.linear_probing.model import (
-    load_reve_and_positions, evaluate_model,
-)
-from src.approaches.linear_probing.stable_adamw import StableAdamW
-from src.approaches.linear_probing.train_lp import (
-    build_raw_dataset, get_channel_names,
-    _get_exponential_warmup_lambda,
-    fmt_dur, COL_W,
-)
-
-
-class _PatienceMonitor:
-    """Early stopping monitor matching official REVE: stops when counter > patience."""
-
-    def __init__(self, patience: int = 10):
-        self.patience = patience
-        self.best_val = 0.0
-        self.counter = 0
-
-    def __call__(self, val: float) -> bool:
-        if val > self.best_val:
-            self.best_val = val
-            self.counter = 0
-            return False
-        else:
-            self.counter += 1
-            return self.counter > self.patience
+from src.approaches.shared.metrics import evaluate_model
+from src.approaches.shared.dataset import build_raw_dataset
+from src.approaches.shared.training_utils import fmt_dur, COL_W
+from src.approaches.shared.reve import load_reve_and_positions, get_channel_names
 
 from src.approaches.fine_tuning.config import (
     FTConfig, OUTPUT_DIR,
@@ -77,257 +72,11 @@ from src.approaches.fine_tuning.config import (
 )
 from src.approaches.fine_tuning.model import ReveClassifierFT
 from src.approaches.fine_tuning.lora import apply_lora, print_lora_summary
+from src.approaches.fine_tuning.training import train_stage
+from src.approaches.fine_tuning.summary import print_fold_summary, print_cross_seed_summary
 
 
-# ── Summary helpers (thin wrappers around shared module) ─────────────────────
-
-from src.approaches.shared.summary import (
-    print_fold_summary as _print_fold_summary,
-    print_cross_seed_summary as _print_cross_seed_summary,
-)
-
-
-def _fold_filename(cfg: FTConfig, gen_seed: int | None) -> str:
-    gen_tag = f"_gen_s{gen_seed}" if gen_seed is not None else ""
-    return (
-        f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_r{cfg.lora_rank}{cfg.mixup_tag}{gen_tag}"
-    )
-
-
-def _cross_seed_filename(cfg: FTConfig) -> str:
-    return (
-        f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_r{cfg.lora_rank}{cfg.mixup_tag}_gen_cross_seed"
-    )
-
-
-def print_fold_summary(
-    cfg: FTConfig,
-    fold_results: list[dict],
-    gen_seed: int | None = None,
-) -> None:
-    _print_fold_summary(
-        cfg,
-        fold_results,
-        output_dir=OUTPUT_DIR,
-        approach_label=f"LoRA r={cfg.lora_rank}",
-        filename_stem=_fold_filename(cfg, gen_seed),
-        extra_json={"approach": "ft_lora", "lora_rank": cfg.lora_rank},
-        gen_seed=gen_seed,
-    )
-
-
-def print_cross_seed_summary(
-    cfg: FTConfig,
-    seed_summaries: list[dict],
-) -> None:
-    _print_cross_seed_summary(
-        cfg,
-        seed_summaries,
-        output_dir=OUTPUT_DIR,
-        approach_label=f"LoRA r={cfg.lora_rank}",
-        filename_stem=_cross_seed_filename(cfg),
-        extra_json={"approach": "ft_lora", "lora_rank": cfg.lora_rank},
-    )
-
-
-# ── Generic training stage ───────────────────────────────────────────────────
-
-def train_stage(
-    model: ReveClassifierFT,
-    train_loader: DataLoader,
-    val_loader: DataLoader,
-    *,
-    stage_name: str,
-    lr: float,
-    max_epochs: int,
-    warmup_epochs: int,
-    scheduler_patience: int,
-    early_stop_patience: int,
-    grad_clip: float,
-    weight_decay: float,
-    use_mixup: bool,
-    use_amp: bool,
-    n_classes: int,
-    device: str,
-    wandb_epoch_offset: int = 0,
-    save_trainable_only: bool = False,
-) -> dict:
-    """
-    Shared training loop for both LP warmup and FT stages.
-
-    Returns dict with best metrics, best state dict, and training stats.
-    """
-    device_type = "cuda" if "cuda" in device else "cpu"
-
-    optimizer = StableAdamW(
-        model.trainable_parameters(),
-        lr=lr,
-        betas=(0.92, 0.999),
-        weight_decay=weight_decay,
-    )
-
-    warmup_steps = warmup_epochs * len(train_loader)
-    warmup_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lr_lambda=_get_exponential_warmup_lambda(warmup_steps),
-    )
-
-    reduce_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="max", factor=0.5, patience=scheduler_patience,
-    )
-
-    scaler = torch.amp.GradScaler()
-    patience_monitor = _PatienceMonitor(early_stop_patience)
-
-    best_metrics = {}
-    best_acc = 0.0
-    best_state = None
-
-    print(f"\n{'─' * COL_W}")
-    print(f"  Stage: {stage_name}  |  lr={lr}  |  max_epochs={max_epochs}  |  grad_clip={grad_clip}")
-    header = (
-        f"{'Epoch':>6}  {'EpTime':>7}  {'Elapsed':>8}  "
-        f"{'TrLoss':>8}  {'TrAcc':>7}  {'VaAcc':>7}  {'VaBalAcc':>9}  "
-        f"{'VaAUROC':>8}  {'VaF1w':>7}  {'LR':>10}"
-    )
-    print(header)
-    print(f"{'─' * COL_W}")
-
-    fit_start = time.time()
-    last_epoch = 0
-
-    for epoch in range(max_epochs):
-        last_epoch = epoch
-        epoch_start = time.time()
-        warmup_active = epoch < warmup_epochs
-
-        # ── Train ──────────────────────────────────────────────────────
-        model.train()
-        epoch_loss = 0.0
-        n_batches = 0
-        n_correct = 0
-        n_samples = 0
-
-        for batch in train_loader:
-            eeg, target = batch[0].to(device), batch[1].long().to(device)
-
-            optimizer.zero_grad(set_to_none=True)
-            with torch.autocast(device_type=device_type, enabled=use_amp, dtype=torch.float16):
-                if use_mixup:
-                    mm = random.random()
-                    perm = torch.randperm(eeg.size(0), device=device)
-                    output = model(mm * eeg + (1 - mm) * eeg[perm])
-                    loss = mm * F.cross_entropy(output, target) + (1 - mm) * F.cross_entropy(output, target[perm])
-                else:
-                    output = model(eeg)
-                    loss = F.cross_entropy(output, target)
-
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-
-            scale_before = scaler.get_scale()
-            scaler.step(optimizer)
-            scaler.update()
-
-            if warmup_active and scale_before == scaler.get_scale():
-                warmup_scheduler.step()
-
-            epoch_loss += loss.item()
-            n_batches += 1
-            with torch.no_grad():
-                preds = output.argmax(dim=1)
-            n_correct += (preds == target).sum().item()
-            n_samples += target.size(0)
-
-        avg_loss = epoch_loss / max(n_batches, 1)
-        train_acc = n_correct / max(n_samples, 1)
-
-        # ── Validate ───────────────────────────────────────────────────
-        metrics = evaluate_model(
-            model, val_loader, device=device,
-            n_classes=n_classes, use_amp=use_amp,
-        )
-
-        val_acc = metrics["accuracy"]
-        val_bal_acc = metrics["balanced_acc"]
-
-        # Scheduler on val_acc, gated behind warmup (matches official)
-        if epoch > warmup_epochs:
-            reduce_scheduler.step(val_acc)
-
-        # Track best by accuracy
-        if val_acc > best_acc:
-            best_acc = val_acc
-            best_metrics = {**metrics, "epoch": epoch + 1}
-            if save_trainable_only:
-                trainable_keys = {n for n, p in model.named_parameters() if p.requires_grad}
-                best_state = {
-                    k: v.cpu().clone()
-                    for k, v in model.state_dict().items()
-                    if k in trainable_keys
-                }
-            else:
-                best_state = {
-                    k: v.cpu().clone()
-                    for k, v in model.state_dict().items()
-                }
-
-        # Print epoch summary
-        ep_time = time.time() - epoch_start
-        elapsed = time.time() - fit_start
-        current_lr = optimizer.param_groups[0]["lr"]
-        avg_ep = elapsed / (epoch + 1)
-        remaining = avg_ep * (max_epochs - epoch - 1)
-        eta = f"ETA {fmt_dur(remaining)}" if epoch + 1 < max_epochs else "done"
-
-        print(
-            f"{epoch+1:>6}  {fmt_dur(ep_time):>7}  {fmt_dur(elapsed):>8}  "
-            f"{avg_loss:>8.4f}  {train_acc:>7.4f}  {val_acc:>7.4f}  {metrics['balanced_acc']:>9.4f}  "
-            f"{metrics['auroc']:>8.4f}  {metrics['f1_weighted']:>7.4f}  "
-            f"{current_lr:>10.2e}  ({eta})"
-        )
-
-        # W&B per-epoch logging (train/ and val/ sections, like LP)
-        if wandb.run is not None:
-            wandb.log({
-                "train/loss":    avg_loss,
-                "train/acc":     train_acc,
-                "val/loss":      metrics.get("val_loss"),
-                "val/acc":       val_acc,
-                "val/bal_acc":   metrics["balanced_acc"],
-                "val/auroc":     metrics["auroc"],
-                "val/f1":        metrics["f1_weighted"],
-                "lr":            current_lr,
-                "stage":         0 if stage_name == "lp" else 1,
-            }, step=wandb_epoch_offset + epoch + 1)
-
-        # Early stopping on accuracy
-        if patience_monitor(val_acc):
-            print(f"Early stopping at epoch {epoch + 1} (patience={early_stop_patience})")
-            break
-
-    total_time = time.time() - fit_start
-    print(f"{'─' * COL_W}")
-    print(
-        f"{stage_name} complete — {last_epoch + 1} epochs | total: {fmt_dur(total_time)} | "
-        f"best epoch={best_metrics.get('epoch', 'n/a')} val_acc={best_acc:.4f}"
-    )
-    print(f"{'─' * COL_W}")
-
-    return {
-        "val_acc":        best_metrics.get("accuracy"),
-        "val_bal_acc":    best_metrics.get("balanced_acc"),
-        "val_auroc":      best_metrics.get("auroc"),
-        "val_f1":         best_metrics.get("f1_weighted"),
-        "best_epoch":     best_metrics.get("epoch"),
-        "epochs_trained": last_epoch + 1,
-        "best_state":     best_state,
-    }
-
-
-# ── Per-fold runner ──────────────────────────────────────────────────────────
+# Per-fold runner
 
 def run_fold_ft(
     cfg: FTConfig,
@@ -339,8 +88,12 @@ def run_fold_ft(
     train_stimuli: set[int] | None = None,
     val_stimuli: set[int] | None = None,
     gen_seed: int | None = None,
+    test_subject_ids: list[int] | None = None,
 ) -> dict:
-    """Run one fold: LP warmup → LoRA fine-tuning."""
+    """
+    Run one fold: LP warmup → LoRA (or full) fine-tuning.
+    """
+
     seed_label = f"  |  gen_seed={gen_seed}" if gen_seed is not None else ""
     gen_tag = f"  |  GENERALIZATION{seed_label}" if cfg.generalization else ""
 
@@ -354,6 +107,13 @@ def run_fold_ft(
     )
     print(f"{'#' * COL_W}")
 
+    # Deep-copy encoder weights so each fold starts from the pretrained state.
+    # apply_lora() mutates the model in-place via get_peft_model(), and full FT
+    # updates encoder weights directly — both would corrupt subsequent folds if
+    # we shared the same reve_model reference.
+    reve_for_fold = copy.deepcopy(reve_model)
+    pos_for_fold  = pos_tensor.clone()
+
     # Build datasets
     t_load = time.time()
     print("Building datasets ...", end="  ", flush=True)
@@ -363,6 +123,11 @@ def run_fold_ft(
         f"done in {fmt_dur(time.time() - t_load)}  "
         f"(train={len(train_ds):,}  val={len(val_ds):,})"
     )
+
+    test_ds = None
+    if test_subject_ids is not None:
+        test_ds = build_raw_dataset(cfg, test_subject_ids)
+        print(f"  test={len(test_ds):,} windows")
 
     train_loader = DataLoader(
         train_ds, batch_size=cfg.batch_size, shuffle=True, num_workers=NUM_WORKERS,
@@ -375,8 +140,8 @@ def run_fold_ft(
 
     # Build model
     model = ReveClassifierFT(
-        reve_model=reve_model,
-        pos_tensor=pos_tensor,
+        reve_model=reve_for_fold,
+        pos_tensor=pos_for_fold,
         n_classes=cfg.num_classes,
         n_channels=cfg.n_channels,
         window_size=cfg.window_size,
@@ -403,7 +168,7 @@ def run_fold_ft(
             config=hparams, reinit=True,
         )
 
-    # ── Stage 1: LP warmup ────────────────────────────────────────────
+    # Stage 1: LP warmup
     model.freeze_encoder()
     model.set_dropout(cfg.lp_dropout)
     print(f"\n>>> Stage 1: LP warmup  |  trainable params: {model.n_trainable_params():,}")
@@ -432,12 +197,16 @@ def run_fold_ft(
         model.load_state_dict(lp_result["best_state"], strict=False)
         model.to(DEVICE)
 
-    # ── Stage 2: LoRA fine-tuning ─────────────────────────────────────
+    # Stage 2: LoRA or full fine-tuning
     model.unfreeze_encoder()
-    apply_lora(model, cfg)
-    model.set_dropout(cfg.ft_dropout)
-    print(f"\n>>> Stage 2: LoRA fine-tuning")
-    print_lora_summary(model)
+    if cfg.full_ft:
+        model.set_dropout(cfg.ft_dropout)
+        print(f"\n>>> Stage 2: Full fine-tuning  |  trainable params: {model.n_trainable_params():,}")
+    else:
+        apply_lora(model, cfg)
+        model.set_dropout(cfg.ft_dropout)
+        print(f"\n>>> Stage 2: LoRA fine-tuning")
+        print_lora_summary(model)
 
     ft_result = train_stage(
         model, train_loader, val_loader,
@@ -465,37 +234,76 @@ def run_fold_ft(
         model.load_state_dict(ft_result["best_state"])
         model.to(DEVICE)
 
-        # Save LoRA adapter weights (peft convention)
-        lora_dir = ckpt_dir / "lora_adapter"
-        model.reve.save_pretrained(str(lora_dir))
-        print(f"LoRA adapter saved → {lora_dir}")
+        if cfg.full_ft:
+            model_path = ckpt_dir / "full_model.pt"
+            torch.save(ft_result["best_state"], model_path)
+            print(f"Full model saved → {model_path}")
+        else:
+            # Save LoRA adapter weights (peft convention)
+            lora_dir = ckpt_dir / "lora_adapter"
+            model.reve.save_pretrained(str(lora_dir))
+            print(f"LoRA adapter saved → {lora_dir}")
 
-        # Save head + cls_query_token
-        head_state = {
-            k: v.cpu().clone() for k, v in model.state_dict().items()
-            if k.startswith("cls_query_token") or k.startswith("linear_head")
-        }
-        head_path = ckpt_dir / "head_weights.pt"
-        torch.save(head_state, head_path)
-        print(f"Head weights saved → {head_path}")
+            # Save head + cls_query_token
+            head_state = {
+                k: v.cpu().clone() for k, v in model.state_dict().items()
+                if k.startswith("cls_query_token") or k.startswith("linear_head")
+            }
+            head_path = ckpt_dir / "head_weights.pt"
+            torch.save(head_state, head_path)
+            print(f"Head weights saved → {head_path}")
+
+    # Test evaluation (revesplit only)
+    test_metrics = None
+    if test_ds is not None:
+        test_loader = DataLoader(
+            test_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=NUM_WORKERS,
+            pin_memory=True,
+        )
+        print(f"\n>>> Test evaluation ({len(test_ds):,} windows)")
+        test_metrics = evaluate_model(
+            model, test_loader, device=DEVICE,
+            n_classes=cfg.num_classes, use_amp=cfg.use_amp,
+        )
+        print(
+            f"  test_acc={test_metrics['accuracy']:.4f}  "
+            f"test_bal_acc={test_metrics['balanced_acc']:.4f}  "
+            f"test_auroc={test_metrics['auroc']:.4f}  "
+            f"test_f1={test_metrics['f1_weighted']:.4f}"
+        )
 
     if USE_WANDB:
-        wandb.log({
+        best_log = {
+            "best/train_loss":  ft_result.get("train_loss"),
+            "best/val_loss":    ft_result.get("val_loss"),
             "best/val_acc":     ft_result.get("val_acc"),
             "best/val_bal_acc": ft_result.get("val_bal_acc"),
             "best/val_auroc":   ft_result.get("val_auroc"),
             "best/val_f1":      ft_result.get("val_f1"),
-        })
+        }
+        if test_metrics is not None:
+            best_log.update({
+                "test/acc":     test_metrics["accuracy"],
+                "test/bal_acc": test_metrics["balanced_acc"],
+                "test/auroc":   test_metrics["auroc"],
+                "test/f1":      test_metrics["f1_weighted"],
+            })
+        wandb.log(best_log)
         wandb.finish()
 
     # Cleanup
-    del model, train_ds, val_ds, train_loader, val_loader
+    to_del = [model, reve_for_fold, pos_for_fold, train_ds, val_ds, train_loader, val_loader]
+    if test_ds is not None:
+        to_del.append(test_ds)
+    del to_del
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    return {
+    result = {
         "fold":              fold_idx,
+        "train_loss":        ft_result.get("train_loss"),
+        "val_loss":          ft_result.get("val_loss"),
         "val_acc":           ft_result.get("val_acc"),
         "val_bal_acc":       ft_result.get("val_bal_acc"),
         "val_auroc":         ft_result.get("val_auroc"),
@@ -503,11 +311,20 @@ def run_fold_ft(
         "best_epoch":        ft_result.get("best_epoch"),
         "lp_epochs_trained": lp_epochs,
         "ft_epochs_trained": ft_result.get("epochs_trained"),
+        "lp_train_loss":     lp_result.get("train_loss"),
         "lp_val_acc":        lp_result.get("val_acc"),
     }
+    if test_metrics is not None:
+        result.update({
+            "test_acc":     test_metrics["accuracy"],
+            "test_bal_acc": test_metrics["balanced_acc"],
+            "test_auroc":   test_metrics["auroc"],
+            "test_f1":      test_metrics["f1_weighted"],
+        })
+    return result
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# CLI
 
 def parse_args() -> FTConfig:
     _d = FTConfig()  # single source of truth for all defaults
@@ -521,6 +338,12 @@ def parse_args() -> FTConfig:
                         help="Classification task")
     parser.add_argument("--fold", type=int, default=None, metavar="N",
                         help="Run only this fold (1-10). Omit for all folds.")
+
+    # FT mode
+    parser.add_argument("--fullft", action="store_true", default=_d.full_ft,
+                        help="Full fine-tuning (no LoRA)")
+    parser.add_argument("--revesplit", action="store_true", default=_d.reve_split,
+                        help="Official REVE split: train 0-79, val 80-99, test 100-122 (FACED only)")
 
     # Pooling
     parser.add_argument("--pooling", choices=["no", "last", "last_avg"], default=_d.pooling)
@@ -568,6 +391,13 @@ def parse_args() -> FTConfig:
 
     lora_alpha = args.lora_alpha if args.lora_alpha is not None else args.lora_rank
 
+    if args.revesplit and args.dataset != "faced":
+        parser.error("--revesplit is only supported for FACED dataset")
+    if args.revesplit and args.generalization:
+        parser.error("--revesplit and --generalization are mutually exclusive")
+    if args.revesplit and args.fold is not None:
+        parser.error("--revesplit and --fold are mutually exclusive")
+
     return FTConfig(
         dataset=args.dataset,
         task_mode=args.task,
@@ -578,6 +408,8 @@ def parse_args() -> FTConfig:
         batch_size=args.batch_size,
         use_mixup=args.use_mixup,
         use_amp=args.use_amp,
+        full_ft=args.fullft,
+        reve_split=args.revesplit,
         lp_max_epochs=args.lp_epochs,
         lp_lr=args.lp_lr,
         ft_max_epochs=args.ft_epochs,
@@ -590,7 +422,7 @@ def parse_args() -> FTConfig:
     )
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Main
 
 def main() -> None:
     import multiprocessing
@@ -609,6 +441,10 @@ def main() -> None:
         f"Device: {DEVICE}  |  task: {cfg.task_mode}  |  pooling: {cfg.pooling}  |  "
         f"LoRA rank: {cfg.lora_rank}  alpha: {cfg.lora_alpha}"
     )
+    if cfg.full_ft:
+        print("  ** fullft mode: full fine-tuning (no LoRA) **")
+    if cfg.reve_split:
+        print("  ** revesplit mode: official REVE train/val/test split **")
     print(
         f"Window: {cfg.window_size / SAMPLING_RATE}s ({cfg.window_size} pts)  "
         f"Stride: {cfg.stride / SAMPLING_RATE}s ({cfg.stride} pts)  "
@@ -622,7 +458,64 @@ def main() -> None:
     # Load REVE model once
     reve_model, pos_tensor = load_reve_and_positions(channel_names, device=DEVICE)
 
-    # Fold splits
+    # REVE split path (single run with test set, match official REVE evaluation protocol on FACED)
+    if cfg.reve_split:
+        train_subjects, val_subjects, test_subjects = get_official_split(cfg.dataset)
+        print(
+            f"\nREVE split: train={len(train_subjects)}  "
+            f"val={len(val_subjects)}  test={len(test_subjects)}"
+        )
+
+        result = run_fold_ft(
+            cfg, 1, train_subjects, val_subjects,
+            reve_model, pos_tensor,
+            test_subject_ids=test_subjects,
+        )
+
+        # Save summary JSON for revesplit
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        summary = {
+            "dataset": cfg.dataset,
+            "task_mode": cfg.task_mode,
+            "approach": "ft_fullft" if cfg.full_ft else "ft_lora",
+            "lora_rank": cfg.lora_rank,
+            "split": "revesplit",
+            "completed_at": datetime.datetime.now().isoformat(),
+            "val": {
+                "acc": result.get("val_acc"),
+                "bal_acc": result.get("val_bal_acc"),
+                "auroc": result.get("val_auroc"),
+                "f1": result.get("val_f1"),
+                "loss": result.get("val_loss"),
+            },
+            "test": {
+                "acc": result.get("test_acc"),
+                "bal_acc": result.get("test_bal_acc"),
+                "auroc": result.get("test_auroc"),
+                "f1": result.get("test_f1"),
+            },
+            "train_loss": result.get("train_loss"),
+            "best_epoch": result.get("best_epoch"),
+            "lp_epochs_trained": result.get("lp_epochs_trained"),
+            "ft_epochs_trained": result.get("ft_epochs_trained"),
+        }
+        ft_tag = "fullft" if cfg.full_ft else f"r{cfg.lora_rank}"
+        summary_path = OUTPUT_DIR / (
+            f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
+            f"{cfg.pool_tag}_{ft_tag}{cfg.mixup_tag}_revesplit.json"
+        )
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=2)
+        print(f"Summary saved -> {summary_path}")
+
+        del reve_model, pos_tensor
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print("\nDone.")
+        return
+
+    # Standard k-fold path
     folds = get_kfold_splits(all_subjects)
     folds_to_run = (
         [(cfg.fold, folds[cfg.fold - 1])]

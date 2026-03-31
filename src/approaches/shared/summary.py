@@ -62,18 +62,21 @@ def print_fold_summary(
     print(f"{'=' * COL_W}")
 
     col = (
-        f"{'Fold':>5}  {'ValAcc':>8}  {'ValBalAcc':>10}  {'ValAUROC':>9}  "
+        f"{'Fold':>5}  {'TrLoss':>8}  {'ValAcc':>8}  {'ValBalAcc':>10}  {'ValAUROC':>9}  "
         f"{'ValF1w':>8}  {'Epochs':>7}  {'BestEp':>7}"
     )
     print(col)
     print("-" * len(col))
 
-    accs, bal_accs, aurocs, f1s = [], [], [], []
+    train_losses, accs, bal_accs, aurocs, f1s = [], [], [], [], []
     for r in fold_results:
+        tl = r.get("train_loss")
         acc = r.get("val_acc")
         bal_acc = r.get("val_bal_acc")
         auroc = r.get("val_auroc")
         f1 = r.get("val_f1")
+        if tl is not None:
+            train_losses.append(tl)
         if acc is not None:
             accs.append(acc)
         if bal_acc is not None:
@@ -85,6 +88,7 @@ def print_fold_summary(
 
         print(
             f"{r['fold']:>5}  "
+            f"{fmt_metric(tl):>8}  "
             f"{fmt_metric(acc):>8}  "
             f"{fmt_metric(bal_acc):>10}  "
             f"{fmt_metric(auroc):>9}  "
@@ -95,13 +99,14 @@ def print_fold_summary(
 
     print("-" * len(col))
 
+    tl_mean, tl_std = _stat(train_losses)
     acc_mean, acc_std = _stat(accs)
     bal_mean, bal_std = _stat(bal_accs)
     aur_mean, aur_std = _stat(aurocs)
     f1_mean, f1_std = _stat(f1s)
 
-    print(f"{'Mean':>5}  {acc_mean:>8}  {bal_mean:>10}  {aur_mean:>9}  {f1_mean:>8}")
-    print(f"{'Std':>5}  {acc_std:>8}  {bal_std:>10}  {aur_std:>9}  {f1_std:>8}")
+    print(f"{'Mean':>5}  {tl_mean:>8}  {acc_mean:>8}  {bal_mean:>10}  {aur_mean:>9}  {f1_mean:>8}")
+    print(f"{'Std':>5}  {tl_std:>8}  {acc_std:>8}  {bal_std:>10}  {aur_std:>9}  {f1_std:>8}")
     print(f"{'=' * COL_W}")
 
     # Save aggregate JSON
@@ -113,12 +118,14 @@ def print_fold_summary(
         "completed_at": datetime.datetime.now().isoformat(),
         "n_folds_run": len(fold_results),
         "mean": {
+            "train_loss": round(statistics.mean(train_losses), 4) if train_losses else None,
             "val_acc": round(statistics.mean(accs), 4) if accs else None,
             "val_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
             "val_auroc": round(statistics.mean(aurocs), 4) if aurocs else None,
             "val_f1": round(statistics.mean(f1s), 4) if f1s else None,
         },
         "std": {
+            "train_loss": round(statistics.stdev(train_losses), 4) if len(train_losses) > 1 else 0.0,
             "val_acc": round(statistics.stdev(accs), 4) if len(accs) > 1 else 0.0,
             "val_bal_acc": round(statistics.stdev(bal_accs), 4) if len(bal_accs) > 1 else 0.0,
             "val_auroc": round(statistics.stdev(aurocs), 4) if len(aurocs) > 1 else 0.0,

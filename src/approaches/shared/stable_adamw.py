@@ -1,14 +1,14 @@
 """
-stable_adamw.py — Simplified StableAdamW optimizer for linear probing.
+stable_adamw.py — StableAdamW optimizer, shared across all training pipelines.
 
-Stripped of DDP, gradient_release, and norm-return features.
-Keeps the core algorithm: debiased betas, RMS-stabilized learning rates,
-decoupled weight decay.
+Simplified port of the official REVE StableAdamW: stripped of DDP,
+gradient_release, and norm-return features. Keeps the core algorithm:
+debiased betas, RMS-stabilized learning rates, decoupled weight decay.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable
+from typing import Callable, Iterable
 
 import torch
 from torch import Tensor

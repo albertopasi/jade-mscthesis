@@ -117,3 +117,22 @@ def get_kfold_splits(
     """
     kfold = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
     return list(kfold.split(subjects))
+
+
+def get_official_split(
+    dataset: str,
+) -> tuple[list[int], list[int], list[int]]:
+    """Official REVE evaluation split (FACED only, 0-indexed).
+
+    Train: subjects 0–79, Val: 80–99, Test: 100–122.
+
+    Returns:
+        (train_subject_ids, val_subject_ids, test_subject_ids).
+    """
+    if dataset != "faced":
+        raise ValueError("Official split is only defined for FACED dataset")
+    all_subjects = get_all_subjects("faced")
+    train = [s for s in all_subjects if s <= 79]
+    val   = [s for s in all_subjects if 80 <= s <= 99]
+    test  = [s for s in all_subjects if s >= 100]
+    return train, val, test
