@@ -32,7 +32,8 @@ jade-mscthesis/
 │       └── reve-positions/         # Position bank for EEG channels
 ├── outputs/
 │   ├── lp_checkpoints/             # Saved LP classifier weights per fold/run
-│   └── ft_checkpoints/             # Saved FT LoRA weights + head + query token per fold/run
+│   ├── ft_checkpoints/             # Saved FT LoRA weights + head + query token per fold/run
+│   └── sc_checkpoints/             # Saved SC LoRA weights + head + query token + projection head per fold/run
 ├── reve_official/                  # Reference only — will be deleted after implementation
 └── src/
     ├── approaches/
@@ -52,13 +53,20 @@ jade-mscthesis/
     │   │   ├── stable_adamw.py     # Legacy file (kept for reference, unused — shared/ is canonical)
     │   │   ├── summary.py          # Thin wrapper around shared summary for LP
     │   │   └── dataset.py          # EmbeddedDataset (fast mode only)
-    │   └── fine_tuning/
-    │       ├── config.py           # FTConfig dataclass + LoRA/two-stage hyperparameters
-    │       ├── model.py            # ReveClassifierFT
-    │       ├── lora.py             # apply_lora, print_lora_summary (peft LoRA injection)
-    │       ├── training.py         # train_stage() — shared loop for LP warmup + FT stages
-    │       ├── summary.py          # Thin wrapper around shared summary for FT
-    │       └── train_ft.py         # Main entry point — CLI + two-stage training loops
+    │   ├── fine_tuning/
+    │   │   ├── config.py           # FTConfig dataclass + LoRA/two-stage hyperparameters
+    │   │   ├── model.py            # ReveClassifierFT
+    │   │   ├── lora.py             # apply_lora, print_lora_summary (peft LoRA injection)
+    │   │   ├── training.py         # train_stage() — shared loop for LP warmup + FT stages
+    │   │   ├── summary.py          # Thin wrapper around shared summary for FT
+    │   │   └── train_ft.py         # Main entry point — CLI + two-stage training loops
+    │   └── supcon/
+    │       ├── config.py           # SCConfig dataclass + SupCon hyperparameters
+    │       ├── model.py            # ReveClassifierSC (FT model + projection head)
+    │       ├── loss.py             # SupConLoss (Khosla et al. 2020, L_sup_out)
+    │       ├── training.py         # train_stage_sc() — joint CE + SupCon training loop
+    │       ├── summary.py          # Thin wrapper around shared summary for SC
+    │       └── train_sc.py         # Main entry point — CLI + two-stage training loops
     ├── datasets/
     │   ├── faced_dataset.py        # FACEDWindowDataset
     │   ├── thu_ep_dataset.py       # THUEPWindowDataset (moved from src/thu_ep/)
@@ -236,6 +244,92 @@ uv run python -m src.approaches.fine_tuning.train_ft --dataset faced --fold 1 --
 ### W&B
 - Project: `eeg-ft-v2`, Entity: `zl-tudelft-thesis`
 - Metrics: `val_acc`, `val_bal_acc`, `val_auroc`, `val_f1`, `val_loss`
+
+---
+
+## SupCon joint training pipeline (CE + Supervised Contrastive Loss)
+
+Joint objective: `L = alpha * L_CE + (1 - alpha) * L_SupCon` where L_SupCon is Khosla et al. 2020 (L_sup_out).
+
+Two-stage pipeline (same as FT):
+1. **LP warmup** — frozen encoder, CE only, projection head frozen
+2. **FT stage** — LoRA/full FT + joint CE + SupCon loss
+
+### Train
+
+```bash
+# All folds, FACED, 9-class (LoRA + SupCon, default)
+uv run python -m src.approaches.supcon.train_sc \
+    --dataset faced --task 9-class
+
+# Custom SupCon hyperparameters
+uv run python -m src.approaches.supcon.train_sc \
+    --dataset faced --alpha 0.7 --temperature 0.1
+
+# Different projection head input representation
+uv run python -m src.approaches.supcon.train_sc \
+    --dataset faced --supcon-repr mean    # or: context (default), both
+
+# Full fine-tuning (no LoRA)
+uv run python -m src.approaches.supcon.train_sc --dataset faced --fullft
+
+# Official REVE static split
+uv run python -m src.approaches.supcon.train_sc --dataset faced --revesplit
+
+# Generalization evaluation
+uv run python -m src.approaches.supcon.train_sc --dataset faced --generalization
+
+# Smoke test
+uv run python -m src.approaches.supcon.train_sc --dataset faced --fold 1 --lp-epochs 2 --ft-epochs 3
+```
+
+### SupCon-specific settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `--alpha` | 0.5 | CE weight: `L = alpha*CE + (1-alpha)*SupCon` |
+| `--temperature` | 0.07 | SupCon temperature tau |
+| `--proj-dim` | 128 | Projection head output dim |
+| `--proj-hidden` | 512 | Projection head hidden dim |
+| `--supcon-repr` | `context` | Projection input: `context` (query-attention), `mean` (mean-pool), `both` (concat) |
+
+### Architecture
+
+- **Classifier head**: same as FT (RMSNorm → Dropout → Linear)
+- **Projection head**: Linear(input_dim, 512) → ReLU → Linear(512, 128) → L2-normalize
+- **Projection input** (configurable via `--supcon-repr`):
+  - `context`: 512-dim query-attention context vector (default)
+  - `mean`: 512-dim mean-pool of all patch tokens
+  - `both`: 1024-dim concatenation of context + mean
+
+### SupCon loss (Khosla L_sup_out)
+
+For each anchor i in a batch of B samples:
+- **P(i)** = same-class samples (excluding self) — positives
+- **A(i)** = all samples except self — denominator
+- Loss averages log-ratio over positive pairs per anchor
+- Samples with no positives (singleton class) excluded from mean
+- Mixup disabled when SupCon active (labels must be clean for pair identification)
+
+### Training details
+
+| Setting | LP warmup stage | FT + SupCon stage |
+|---|---|---|
+| Loss | CE only | alpha * CE + (1-alpha) * SupCon |
+| Optimizer | StableAdamW (betas=0.92/0.999, wd=0.01) | same |
+| LR | 5e-3 | 1e-4 |
+| Mixup | disabled | disabled |
+| Projection head | frozen | trainable |
+
+All other settings (epochs, patience, grad clip, AMP, etc.) match the FT pipeline.
+
+### Saved checkpoints
+- Same format as FT (LoRA adapter + head weights, no projection head in main checkpoint)
+- Projection head saved separately as `projection_head.pt` for analysis
+
+### W&B
+- Project: `eeg-sc-v2`, Entity: `zl-tudelft-thesis`
+- Extra metrics: `train/loss_ce`, `train/loss_sc` (component losses)
 
 ---
 
