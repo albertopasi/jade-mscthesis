@@ -18,3 +18,5 @@ debug_output
 wandb/
 runs_srt/
 delftblue
+
+slurm/logs/*

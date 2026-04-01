@@ -1,0 +1,25 @@
+{
+  "dataset": "faced",
+  "task_mode": "9-class",
+  "approach": "ft_fullft",
+  "lora_rank": 16,
+  "split": "revesplit",
+  "completed_at": "2026-04-01T04:13:25.116166",
+  "val": {
+    "acc": 0.4720238095238095,
+    "bal_acc": 0.4705246913580247,
+    "auroc": 0.8212597093621399,
+    "f1": 0.4701829896060253,
+    "loss": 1.656313141187032
+  },
+  "test": {
+    "acc": 0.40993788819875776,
+    "bal_acc": 0.41156736446591524,
+    "auroc": 0.7968858666479965,
+    "f1": 0.4102853517066417
+  },
+  "train_loss": 0.7781605599891572,
+  "best_epoch": 45,
+  "lp_epochs_trained": 20,
+  "ft_epochs_trained": 65
+}
