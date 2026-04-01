@@ -42,6 +42,7 @@ import copy
 import datetime
 import gc
 import json
+import shutil
 import statistics
 import sys
 import time
@@ -225,11 +226,13 @@ def run_fold_ft(
         wandb_epoch_offset=lp_epochs,
     )
 
-    # Save best checkpoint (LoRA adapters + head + cls_query_token)
-    ckpt_dir = OUTPUT_DIR / run_name
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
-
+    # Save checkpoint (LoRA adapters + head + cls_query_token)
+    # The caller is responsible for deleting this dir if a later fold is better.
+    ckpt_dir = None
     if ft_result.get("best_state"):
+        ckpt_dir = OUTPUT_DIR / run_name
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
+
         # Restore best FT state
         model.load_state_dict(ft_result["best_state"])
         model.to(DEVICE)
@@ -252,6 +255,20 @@ def run_fold_ft(
             head_path = ckpt_dir / "head_weights.pt"
             torch.save(head_state, head_path)
             print(f"Head weights saved → {head_path}")
+
+        # Save fold metadata so val set can be reconstructed for visualisations.
+        meta = {
+            "fold": fold_idx,
+            "gen_seed": gen_seed,
+            "val_subject_ids": val_subject_ids,
+            "val_stimuli": sorted(val_stimuli) if val_stimuli is not None else None,
+            "val_acc": ft_result.get("val_acc"),
+            "val_bal_acc": ft_result.get("val_bal_acc"),
+            "val_auroc": ft_result.get("val_auroc"),
+        }
+        with open(ckpt_dir / "fold_meta.json", "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2)
+        print(f"Fold metadata saved → {ckpt_dir / 'fold_meta.json'}")
 
     # Test evaluation (revesplit only)
     test_metrics = None
@@ -313,6 +330,7 @@ def run_fold_ft(
         "ft_epochs_trained": ft_result.get("epochs_trained"),
         "lp_train_loss":     lp_result.get("train_loss"),
         "lp_val_acc":        lp_result.get("val_acc"),
+        "ckpt_dir":          ckpt_dir,
     }
     if test_metrics is not None:
         result.update({
@@ -544,6 +562,9 @@ def main() -> None:
             print(f"{'=' * COL_W}")
 
         fold_results: list[dict] = []
+        best_ckpt_dir: Path | None = None
+        best_ckpt_acc: float = -1.0
+
         for fold_idx, (train_idx, val_idx) in folds_to_run:
             train_subjects = [all_subjects[i] for i in train_idx]
             val_subjects   = [all_subjects[i] for i in val_idx]
@@ -556,8 +577,25 @@ def main() -> None:
             )
             fold_results.append(result)
 
+            # Keep only the best fold's checkpoint on disk.
+            fold_acc = result.get("val_acc") or 0.0
+            fold_ckpt = result.get("ckpt_dir")
+            if fold_ckpt is not None:
+                if fold_acc > best_ckpt_acc:
+                    # New best — delete the previous best checkpoint.
+                    if best_ckpt_dir is not None and best_ckpt_dir.exists():
+                        shutil.rmtree(best_ckpt_dir)
+                        print(f"  [ckpt] Removed previous best: {best_ckpt_dir.name}")
+                    best_ckpt_acc = fold_acc
+                    best_ckpt_dir = fold_ckpt
+                    print(f"  [ckpt] New best: fold {fold_idx}  val_acc={fold_acc:.4f}  → {fold_ckpt.name}")
+                else:
+                    # Not better — delete immediately.
+                    shutil.rmtree(fold_ckpt)
+                    print(f"  [ckpt] Removed (not best, val_acc={fold_acc:.4f}): {fold_ckpt.name}")
+
         if len(fold_results) > 1:
-            print_fold_summary(cfg, fold_results, gen_seed=gen_seed)
+            print_fold_summary(cfg, [{k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results], gen_seed=gen_seed)
 
         if gen_seed is not None:
             accs     = [r["val_acc"]     for r in fold_results if r.get("val_acc")     is not None]
@@ -570,7 +608,7 @@ def main() -> None:
                 "mean_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
                 "mean_auroc":   round(statistics.mean(aurocs),   4) if aurocs   else None,
                 "mean_f1":      round(statistics.mean(f1s),      4) if f1s      else None,
-                "folds":        fold_results,
+                "folds":        [{k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results],
             })
 
     # Cleanup
