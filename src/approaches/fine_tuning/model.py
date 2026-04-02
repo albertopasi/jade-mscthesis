@@ -97,7 +97,7 @@ class ReveClassifierFT(nn.Module):
 
         elif self.pooling == "no":
             query = self.cls_query_token.expand(B, -1, -1)
-            attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim ** 0.5)
+            attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim**0.5)
             attn_weights = torch.softmax(attn_scores, dim=-1)
             context = torch.matmul(attn_weights, x)
 
@@ -107,7 +107,7 @@ class ReveClassifierFT(nn.Module):
 
         else:  # "last"
             query = self.cls_query_token.expand(B, -1, -1)
-            attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim ** 0.5)
+            attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim**0.5)
             attn_weights = torch.softmax(attn_scores, dim=-1)
             context = torch.matmul(attn_weights, x).squeeze(1)
             return self.linear_head(context)

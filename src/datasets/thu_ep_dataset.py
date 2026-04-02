@@ -12,15 +12,38 @@ from typing import Dict
 
 from .base import EEGWindowDataset
 
-
 # 30 THU-EP electrode names (32 original minus A1, A2)
 THU_EP_CHANNELS: list[str] = [
-    "Fp1", "Fp2", "Fz", "F3", "F4", "F7", "F8",
-    "FC1", "FC2", "FC5", "FC6",
-    "Cz", "C3", "C4", "T3", "T4",
-    "CP1", "CP2", "CP5", "CP6",
-    "Pz", "P3", "P4", "T5", "T6",
-    "PO3", "PO4", "Oz", "O1", "O2",
+    "Fp1",
+    "Fp2",
+    "Fz",
+    "F3",
+    "F4",
+    "F7",
+    "F8",
+    "FC1",
+    "FC2",
+    "FC5",
+    "FC6",
+    "Cz",
+    "C3",
+    "C4",
+    "T3",
+    "T4",
+    "CP1",
+    "CP2",
+    "CP5",
+    "CP6",
+    "Pz",
+    "P3",
+    "P4",
+    "T5",
+    "T6",
+    "PO3",
+    "PO4",
+    "Oz",
+    "O1",
+    "O2",
 ]
 
 # Subject 75 is corrupted — skip entirely
@@ -47,7 +70,7 @@ class THUEPWindowDataset(EEGWindowDataset):
     """
 
     EXCLUDED_SUBJECTS = EXCLUDED_SUBJECTS
-    EXCLUDED_STIMULI  = EXCLUDED_STIMULI
+    EXCLUDED_STIMULI = EXCLUDED_STIMULI
 
     def _subject_path(self, sid: int) -> Path:
         return self.data_root / f"sub_{sid:02d}.npy"

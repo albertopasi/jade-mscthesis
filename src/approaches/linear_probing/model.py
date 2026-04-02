@@ -10,8 +10,6 @@ Provides:
 
 from __future__ import annotations
 
-import math
-import random
 from pathlib import Path
 from typing import Tuple
 
@@ -22,12 +20,11 @@ from einops import rearrange
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from src.approaches.linear_probing.config import LPConfig
-from src.approaches.shared.model_utils import RMSNorm, compute_n_patches
-from src.approaches.shared.metrics import evaluate_model
 
+from src.approaches.shared.model_utils import RMSNorm, compute_n_patches
 
 # ── ReveClassifierLP ────────────────────────────────
+
 
 class ReveClassifierLP(nn.Module):
     """
@@ -124,7 +121,7 @@ class ReveClassifierLP(nn.Module):
         elif self.pooling == "no":
             # Query attention
             query = self.cls_query_token.expand(B, -1, -1)  # (B, 1, E)
-            attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim ** 0.5)
+            attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim**0.5)
             attn_weights = torch.softmax(attn_scores, dim=-1)  # (B, 1, n_tokens)
             context = torch.matmul(attn_weights, x)  # (B, 1, E)
 
@@ -135,7 +132,7 @@ class ReveClassifierLP(nn.Module):
 
         else:  # "last"
             query = self.cls_query_token.expand(B, -1, -1)
-            attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim ** 0.5)
+            attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim**0.5)
             attn_weights = torch.softmax(attn_scores, dim=-1)
             context = torch.matmul(attn_weights, x).squeeze(1)  # (B, E)
             return self.linear_head(context)
@@ -149,8 +146,8 @@ class ReveClassifierLP(nn.Module):
         return sum(p.numel() for p in self.trainable_parameters())
 
 
-
 # ── EmbeddingExtractor (fast mode) ──────────────────────────────────────────
+
 
 class EmbeddingExtractor:
     """
@@ -184,8 +181,11 @@ class EmbeddingExtractor:
             stimulus_indices: (N,) int64 on CPU.
         """
         loader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=False,
-            num_workers=0, pin_memory=True,
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=True,
         )
 
         all_embeddings: list[Tensor] = []
@@ -200,11 +200,11 @@ class EmbeddingExtractor:
             out_4d: Tensor = self.reve(eeg_batch, pos)  # (B, C, H, 512)
 
             if use_pooling:
-                emb = self.reve.attention_pooling(out_4d)   # (B, 512)
+                emb = self.reve.attention_pooling(out_4d)  # (B, 512)
             elif no_pool_mode == "mean":
-                emb = out_4d.mean(dim=1).reshape(B, -1)     # (B, H*512)
+                emb = out_4d.mean(dim=1).reshape(B, -1)  # (B, H*512)
             else:  # "flat"
-                emb = out_4d.reshape(B, -1)                  # (B, C*H*512)
+                emb = out_4d.reshape(B, -1)  # (B, C*H*512)
 
             all_embeddings.append(emb.cpu())
             all_labels.append(label_batch.long())
@@ -279,14 +279,14 @@ class LinearProber(L.LightningModule):
         metric_kwargs = dict(task=task, num_classes=num_classes, average="macro")
 
         self.train_acc = torchmetrics.Accuracy(**metric_kwargs)
-        self.val_acc   = torchmetrics.Accuracy(**metric_kwargs)
+        self.val_acc = torchmetrics.Accuracy(**metric_kwargs)
 
         auroc_kwargs = dict(task=task, num_classes=num_classes, average="macro")
         self.train_auroc = torchmetrics.AUROC(**auroc_kwargs)
-        self.val_auroc   = torchmetrics.AUROC(**auroc_kwargs)
+        self.val_auroc = torchmetrics.AUROC(**auroc_kwargs)
 
         self.train_f1 = torchmetrics.F1Score(**metric_kwargs)
-        self.val_f1   = torchmetrics.F1Score(**metric_kwargs)
+        self.val_f1 = torchmetrics.F1Score(**metric_kwargs)
 
     def forward(self, x: Tensor) -> Tensor:
         if self.normalize_features:
@@ -305,18 +305,18 @@ class LinearProber(L.LightningModule):
 
         auroc_preds = probs[:, 1] if self.num_classes == 2 else probs
 
-        acc   = getattr(self, f"{prefix}_acc")
+        acc = getattr(self, f"{prefix}_acc")
         auroc = getattr(self, f"{prefix}_auroc")
-        f1    = getattr(self, f"{prefix}_f1")
+        f1 = getattr(self, f"{prefix}_f1")
 
         acc(preds, labels)
         auroc(auroc_preds, labels)
         f1(preds, labels)
 
-        self.log(f"{prefix}/loss",  loss,        on_step=False, on_epoch=True, prog_bar=True)
-        self.log(f"{prefix}/acc",   acc,          on_step=False, on_epoch=True, prog_bar=True)
-        self.log(f"{prefix}/auroc", auroc,        on_step=False, on_epoch=True, prog_bar=True)
-        self.log(f"{prefix}/f1",    f1,           on_step=False, on_epoch=True, prog_bar=False)
+        self.log(f"{prefix}/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(f"{prefix}/acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(f"{prefix}/auroc", auroc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(f"{prefix}/f1", f1, on_step=False, on_epoch=True, prog_bar=False)
 
         return loss
 
@@ -329,7 +329,10 @@ class LinearProber(L.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.classifier.parameters(), lr=self.lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="max", factor=0.5, patience=self.scheduler_patience,
+            optimizer,
+            mode="max",
+            factor=0.5,
+            patience=self.scheduler_patience,
         )
         return {
             "optimizer": optimizer,

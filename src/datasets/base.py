@@ -16,10 +16,9 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
-
 # ── Shared label structure (identical for FACED and THU-EP) ──────────────────
 
-N_STIMULI    = 28
+N_STIMULI = 28
 N_TIMEPOINTS = 6000  # 30 s at 200 Hz after preprocessing
 
 # 9-class label per stimulus index (0-27)
@@ -29,15 +28,28 @@ STIMULUS_LABELS: np.ndarray = np.array(
 
 # Emotion names for reference
 EMOTION_NAMES = {
-    0: "Anger", 1: "Disgust", 2: "Fear", 3: "Sadness", 4: "Neutral",
-    5: "Amusement", 6: "Inspiration", 7: "Joy", 8: "Tenderness",
+    0: "Anger",
+    1: "Disgust",
+    2: "Fear",
+    3: "Sadness",
+    4: "Neutral",
+    5: "Amusement",
+    6: "Inspiration",
+    7: "Joy",
+    8: "Tenderness",
 }
 
 # Binary mapping: neg=0, pos=1, neutral=None (dropped)
 BINARY_REMAP: Dict[int, Optional[int]] = {
-    0: 0, 1: 0, 2: 0, 3: 0,   # negative
-    4: None,                    # neutral — dropped
-    5: 1, 6: 1, 7: 1, 8: 1,   # positive
+    0: 0,
+    1: 0,
+    2: 0,
+    3: 0,  # negative
+    4: None,  # neutral — dropped
+    5: 1,
+    6: 1,
+    7: 1,
+    8: 1,  # positive
 }
 
 
@@ -58,6 +70,7 @@ def build_stimulus_label_map(task_mode: str) -> Dict[int, Optional[int]]:
 
 
 # ── Base dataset class ────────────────────────────────────────────────────────
+
 
 class EEGWindowDataset(Dataset):
     """
@@ -87,11 +100,11 @@ class EEGWindowDataset(Dataset):
     ) -> None:
         super().__init__()
 
-        self.task_mode      = task_mode
-        self.data_root      = Path(data_root)
-        self.window_size    = window_size
-        self.stride         = stride
-        self.scale_factor   = scale_factor
+        self.task_mode = task_mode
+        self.data_root = Path(data_root)
+        self.window_size = window_size
+        self.stride = stride
+        self.scale_factor = scale_factor
         self.stimulus_filter = stimulus_filter
 
         self._label_map = build_stimulus_label_map(task_mode)
@@ -104,8 +117,7 @@ class EEGWindowDataset(Dataset):
             path = self._subject_path(sid)
             if not path.exists():
                 raise FileNotFoundError(
-                    f"Preprocessed file not found: {path}\n"
-                    f"Run the preprocessing script first."
+                    f"Preprocessed file not found: {path}\nRun the preprocessing script first."
                 )
             self.data_cache[sid] = np.load(path)
 
@@ -138,4 +150,6 @@ class EEGWindowDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
         sid, stim_idx, window_start = self.index[idx]
         window = self.data_cache[sid][stim_idx, :, window_start : window_start + self.window_size]
-        return torch.from_numpy(window.astype(np.float32)) / self.scale_factor, self._label_map[stim_idx]
+        return torch.from_numpy(window.astype(np.float32)) / self.scale_factor, self._label_map[
+            stim_idx
+        ]

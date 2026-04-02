@@ -39,7 +39,7 @@ class EmbeddedDataset(Dataset):
 
         payload = torch.load(embeddings_path, map_location="cpu", weights_only=True)
         self.embeddings: Tensor = payload["embeddings"]  # (N, 512)
-        self.labels: Tensor = payload["labels"]          # (N,)
+        self.labels: Tensor = payload["labels"]  # (N,)
 
         assert self.embeddings.shape[0] == self.labels.shape[0], (
             "Mismatch between number of embeddings and labels."

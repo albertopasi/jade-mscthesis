@@ -6,13 +6,15 @@ Thin wrappers around the shared summary module.
 
 from __future__ import annotations
 
-from src.approaches.linear_probing.config import LPConfig, OUTPUT_DIR
+from src.approaches.linear_probing.config import OUTPUT_DIR, LPConfig
+from src.approaches.shared.summary import (
+    fmt_metric,
+)
+from src.approaches.shared.summary import (
+    print_cross_seed_summary as _print_cross_seed_summary,
+)
 from src.approaches.shared.summary import (
     print_fold_summary as _print_fold_summary,
-    print_cross_seed_summary as _print_cross_seed_summary,
-    fmt_metric,
-    _stat,
-    COL_W,
 )
 
 # Re-export for backward compatibility

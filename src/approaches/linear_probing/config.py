@@ -8,37 +8,32 @@ and summary functions.
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import torch
 
 from src.approaches.shared.config import (
-    PROJECT_ROOT,
     DATA_ROOTS,
-    REVE_MODEL_PATH,
-    REVE_POS_PATH,
-    SAMPLING_RATE,
-    DEVICE,
-    NUM_WORKERS,
     DATASET_DEFAULTS,
+    PROJECT_ROOT,
+    SAMPLING_RATE,
 )
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 EMBEDDINGS_ROOTS = {
     "thu-ep": PROJECT_ROOT / "data" / "thu ep" / "embeddings_v2",
-    "faced":  PROJECT_ROOT / "data" / "FACED" / "embeddings_v2",
+    "faced": PROJECT_ROOT / "data" / "FACED" / "embeddings_v2",
 }
 
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "lp_checkpoints"
 
 # ── W&B ───────────────────────────────────────────────────────────────────────
 
-USE_WANDB     = True
+USE_WANDB = True
 WANDB_PROJECT = "eeg-lp-v2"
-WANDB_ENTITY  = "zl-tudelft-thesis"
+WANDB_ENTITY = "zl-tudelft-thesis"
 
 # ── Hardware (LP-specific) ────────────────────────────────────────────────────
 
@@ -56,8 +51,8 @@ class LPConfig:
     dataset: str = "faced"
 
     # Mode
-    official_mode: bool = True   # True = frozen encoder + trainable query token
-                                  # False = pre-computed embeddings (fast mode)
+    official_mode: bool = True  # True = frozen encoder + trainable query token
+    # False = pre-computed embeddings (fast mode)
 
     # Task
     task_mode: str = "binary"
@@ -66,11 +61,11 @@ class LPConfig:
     gen_seeds: list[int] = field(default_factory=lambda: [123, 456, 789])
 
     # Window
-    window_size: int = 2000    # 10 s at 200 Hz
-    stride: int = 2000         # non-overlapping
+    window_size: int = 2000  # 10 s at 200 Hz
+    stride: int = 2000  # non-overlapping
 
     # Pooling (official mode)
-    pooling: str = "no"        # "no", "last", "last_avg"
+    pooling: str = "no"  # "no", "last", "last_avg"
 
     # Training
     max_epochs: int = 50
@@ -89,8 +84,8 @@ class LPConfig:
 
     # Features (fast mode only)
     normalize_features: bool = False
-    use_pooling: bool = True       # fast-mode pooling toggle
-    no_pool_mode: str = "mean"     # fast-mode: "mean" or "flat"
+    use_pooling: bool = True  # fast-mode pooling toggle
+    no_pool_mode: str = "mean"  # fast-mode: "mean" or "flat"
 
     # Scale factor
     scale_factor: float = 1000.0
@@ -115,7 +110,7 @@ class LPConfig:
 
     @property
     def window_tag(self) -> str:
-        w_s  = round(self.window_size / SAMPLING_RATE)
+        w_s = round(self.window_size / SAMPLING_RATE)
         st_s = round(self.stride / SAMPLING_RATE)
         return f"w{w_s}s{st_s}"
 
@@ -165,33 +160,33 @@ class LPConfig:
         gen_seed: int | None = None,
     ) -> dict:
         return {
-            "dataset":            self.dataset,
-            "data_tag":           self.data_tag,
-            "official_mode":      self.official_mode,
-            "task_mode":          self.task_mode,
-            "fold":               fold_idx,
-            "n_folds":            n_folds,
-            "batch_size":         self.batch_size,
-            "lr":                 self.lr,
-            "dropout":            self.dropout,
-            "weight_decay":       self.weight_decay,
-            "warmup_epochs":      self.warmup_epochs,
+            "dataset": self.dataset,
+            "data_tag": self.data_tag,
+            "official_mode": self.official_mode,
+            "task_mode": self.task_mode,
+            "fold": fold_idx,
+            "n_folds": n_folds,
+            "batch_size": self.batch_size,
+            "lr": self.lr,
+            "dropout": self.dropout,
+            "weight_decay": self.weight_decay,
+            "warmup_epochs": self.warmup_epochs,
             "scheduler_patience": self.scheduler_patience,
             "early_stop_patience": self.early_stop_patience,
-            "max_epochs":         self.max_epochs,
-            "window_size":        self.window_size,
-            "stride":             self.stride,
-            "pooling":            self.pooling if self.official_mode else self.pool_tag,
-            "n_train_subjects":   n_train_subjects,
-            "n_val_subjects":     n_val_subjects,
-            "n_train_windows":    n_train_windows,
-            "n_val_windows":      n_val_windows,
+            "max_epochs": self.max_epochs,
+            "window_size": self.window_size,
+            "stride": self.stride,
+            "pooling": self.pooling if self.official_mode else self.pool_tag,
+            "n_train_subjects": n_train_subjects,
+            "n_val_subjects": n_val_subjects,
+            "n_train_windows": n_train_windows,
+            "n_val_windows": n_val_windows,
             "normalize_features": self.normalize_features,
-            "embed_dim":          embed_dim,
-            "generalization":     self.generalization,
-            "gen_seed":           gen_seed,
-            "use_mixup":          self.use_mixup,
-            "use_amp":            self.use_amp,
-            "grad_clip":          self.grad_clip,
-            "scale_factor":       self.scale_factor,
+            "embed_dim": embed_dim,
+            "generalization": self.generalization,
+            "gen_seed": gen_seed,
+            "use_mixup": self.use_mixup,
+            "use_amp": self.use_amp,
+            "grad_clip": self.grad_clip,
+            "scale_factor": self.scale_factor,
         }

@@ -30,18 +30,17 @@ from pathlib import Path
 import numpy as np
 from scipy import signal as scipy_signal
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
-RAW_DIR   = PROJECT_ROOT / "data" / "FACED" / "Processed_data"
-OUT_DIR   = PROJECT_ROOT / "data" / "FACED" / "preprocessed_v2"
+RAW_DIR = PROJECT_ROOT / "data" / "FACED" / "Processed_data"
+OUT_DIR = PROJECT_ROOT / "data" / "FACED" / "preprocessed_v2"
 
-N_SUBJECTS       = 123
-ORIG_SFREQ       = 250
-TARGET_SFREQ     = 200
-ORIG_TIMEPOINTS  = 7500   # 30 s × 250 Hz
+N_SUBJECTS = 123
+ORIG_SFREQ = 250
+TARGET_SFREQ = 200
+ORIG_TIMEPOINTS = 7500  # 30 s × 250 Hz
 TARGET_TIMEPOINTS = 6000  # 30 s × 200 Hz
-EXPECTED_SHAPE   = (28, 32, TARGET_TIMEPOINTS)
+EXPECTED_SHAPE = (28, 32, TARGET_TIMEPOINTS)
 
 
 def preprocess_subject(subject_id: int) -> None:
@@ -71,24 +70,33 @@ def validate_subject(subject_id: int) -> dict:
     has_inf = bool(np.isinf(arr).any())
 
     return {
-        "valid":       shape_valid and not has_nan and not has_inf,
-        "shape":       arr.shape,
+        "valid": shape_valid and not has_nan and not has_inf,
+        "shape": arr.shape,
         "shape_valid": shape_valid,
-        "has_nan":     has_nan,
-        "has_inf":     has_inf,
-        "min":         float(arr.min()),
-        "max":         float(arr.max()),
-        "mean":        float(arr.mean()),
-        "std":         float(arr.std()),
+        "has_nan": has_nan,
+        "has_inf": has_inf,
+        "min": float(arr.min()),
+        "max": float(arr.max()),
+        "mean": float(arr.mean()),
+        "std": float(arr.std()),
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="FACED EEG preprocessing")
-    parser.add_argument("--subjects", "-s", nargs="+", type=int,
-                        help="Subject IDs to process (0-indexed). Processes all if omitted.")
-    parser.add_argument("--validate", "-v", action="store_true",
-                        help="Validate preprocessed files instead of processing.")
+    parser.add_argument(
+        "--subjects",
+        "-s",
+        nargs="+",
+        type=int,
+        help="Subject IDs to process (0-indexed). Processes all if omitted.",
+    )
+    parser.add_argument(
+        "--validate",
+        "-v",
+        action="store_true",
+        help="Validate preprocessed files instead of processing.",
+    )
     args = parser.parse_args()
 
     subject_ids = args.subjects if args.subjects else list(range(N_SUBJECTS))
@@ -126,7 +134,7 @@ def main() -> None:
             print(f"  sub{sid:03d}  FAILED: {e}")
             fail += 1
 
-    print(f"\nDone — {ok} succeeded, {fail} failed  ({time.time()-t0:.1f}s total)")
+    print(f"\nDone — {ok} succeeded, {fail} failed  ({time.time() - t0:.1f}s total)")
 
 
 if __name__ == "__main__":

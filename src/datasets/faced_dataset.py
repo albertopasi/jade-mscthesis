@@ -12,16 +12,40 @@ from typing import Dict
 
 from .base import EEGWindowDataset
 
-
 # 32 FACED electrode names in official order
 FACED_CHANNELS: list[str] = [
-    "FP1", "FP2", "FZ", "F3", "F4", "F7", "F8",
-    "FC1", "FC2", "FC5", "FC6",
-    "CZ", "C3", "C4", "T3", "T4",
-    "CP1", "CP2", "CP5", "CP6",
-    "PZ", "P3", "P4", "T5", "T6",
-    "PO3", "PO4", "OZ", "O1", "O2",
-    "A2", "A1",
+    "FP1",
+    "FP2",
+    "FZ",
+    "F3",
+    "F4",
+    "F7",
+    "F8",
+    "FC1",
+    "FC2",
+    "FC5",
+    "FC6",
+    "CZ",
+    "C3",
+    "C4",
+    "T3",
+    "T4",
+    "CP1",
+    "CP2",
+    "CP5",
+    "CP6",
+    "PZ",
+    "P3",
+    "P4",
+    "T5",
+    "T6",
+    "PO3",
+    "PO4",
+    "OZ",
+    "O1",
+    "O2",
+    "A2",
+    "A1",
 ]
 
 EXCLUDED_SUBJECTS: set[int] = set()
@@ -42,7 +66,7 @@ class FACEDWindowDataset(EEGWindowDataset):
     """
 
     EXCLUDED_SUBJECTS = EXCLUDED_SUBJECTS
-    EXCLUDED_STIMULI  = EXCLUDED_STIMULI
+    EXCLUDED_STIMULI = EXCLUDED_STIMULI
 
     def _subject_path(self, sid: int) -> Path:
         return self.data_root / f"sub{sid:03d}.npy"

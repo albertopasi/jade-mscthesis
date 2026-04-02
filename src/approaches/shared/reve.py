@@ -21,9 +21,11 @@ def get_channel_names(dataset: str) -> list[str]:
     """Return electrode channel names for the specified dataset."""
     if dataset == "faced":
         from src.datasets.faced_dataset import FACED_CHANNELS
+
         return FACED_CHANNELS
     else:
         from src.preprocessing.thu_ep.config import THUEPConfig
+
         return THUEPConfig().final_channels
 
 
@@ -41,7 +43,9 @@ def load_reve_and_positions(
     """
     print("Loading REVE model from local path …")
     reve_model = AutoModel.from_pretrained(
-        str(reve_model_path), trust_remote_code=True, torch_dtype="auto",
+        str(reve_model_path),
+        trust_remote_code=True,
+        torch_dtype="auto",
     )
     reve_model.eval()
     reve_model.to(device)
@@ -50,7 +54,9 @@ def load_reve_and_positions(
 
     print("Loading REVE position bank from local path …")
     pos_bank = AutoModel.from_pretrained(
-        str(reve_pos_path), trust_remote_code=True, torch_dtype="auto",
+        str(reve_pos_path),
+        trust_remote_code=True,
+        torch_dtype="auto",
     )
     pos_bank.eval()
     pos_bank.to(device)

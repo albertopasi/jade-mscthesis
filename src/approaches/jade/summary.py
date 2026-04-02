@@ -6,10 +6,12 @@ Thin wrappers around the shared summary module.
 
 from __future__ import annotations
 
-from src.approaches.jade.config import JADEConfig, OUTPUT_DIR
+from src.approaches.jade.config import OUTPUT_DIR, JADEConfig
+from src.approaches.shared.summary import (
+    print_cross_seed_summary as _print_cross_seed_summary,
+)
 from src.approaches.shared.summary import (
     print_fold_summary as _print_fold_summary,
-    print_cross_seed_summary as _print_cross_seed_summary,
 )
 
 

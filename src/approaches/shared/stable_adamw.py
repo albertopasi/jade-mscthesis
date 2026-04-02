@@ -49,8 +49,7 @@ class StableAdamW(Optimizer):
         if not 0.0 <= eps:
             raise ValueError(f"Invalid epsilon: {eps}")
 
-        defaults = dict(lr=lr, beta1=betas[0], beta2=betas[1],
-                        weight_decay=weight_decay, eps=eps)
+        defaults = dict(lr=lr, beta1=betas[0], beta2=betas[1], weight_decay=weight_decay, eps=eps)
         super().__init__(params, defaults)
 
     @torch.no_grad()
@@ -95,7 +94,7 @@ class StableAdamW(Optimizer):
                 exp_avg_sq.mul_(beta2_hat).addcmul_(grad, grad, value=1 - beta2_hat)
 
                 # RMS stabilization: compute per-parameter RMS of update ratio
-                eps_sq = eps ** 2
+                eps_sq = eps**2
                 denom_sq = torch.maximum(exp_avg_sq, torch.full_like(exp_avg_sq, eps_sq))
                 rms = (grad.pow(2) / denom_sq).mean().sqrt().item()
                 neg_lr = -lr / max(1.0, rms)

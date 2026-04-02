@@ -6,10 +6,12 @@ Thin wrappers around the shared summary module.
 
 from __future__ import annotations
 
-from src.approaches.fine_tuning.config import FTConfig, OUTPUT_DIR
+from src.approaches.fine_tuning.config import OUTPUT_DIR, FTConfig
+from src.approaches.shared.summary import (
+    print_cross_seed_summary as _print_cross_seed_summary,
+)
 from src.approaches.shared.summary import (
     print_fold_summary as _print_fold_summary,
-    print_cross_seed_summary as _print_cross_seed_summary,
 )
 
 

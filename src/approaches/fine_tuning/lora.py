@@ -77,8 +77,7 @@ def print_lora_summary(model: nn.Module) -> None:
     total = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     lora_params = sum(
-        p.numel() for n, p in model.named_parameters()
-        if p.requires_grad and "lora_" in n
+        p.numel() for n, p in model.named_parameters() if p.requires_grad and "lora_" in n
     )
     print(
         f"  Parameters: {trainable:,} trainable / {total:,} total "

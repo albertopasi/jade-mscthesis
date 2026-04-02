@@ -14,14 +14,13 @@ import math
 import time
 from pathlib import Path
 
-import torch
 import lightning as L
-
+import torch
 
 # ── Formatting helpers ──────────────────────────────────────────────────────
 
 COL_W = 90
-SEP   = "─" * COL_W
+SEP = "─" * COL_W
 HEADER = (
     f"{'Epoch':>6}  {'EpTime':>7}  {'Elapsed':>8}  "
     f"{'TrLoss':>8}  {'TrAcc':>7}  "
@@ -32,7 +31,7 @@ HEADER = (
 def fmt_dur(seconds: float) -> str:
     """Format a duration in seconds into a compact human-readable string."""
     h, rem = divmod(int(seconds), 3600)
-    m, s   = divmod(rem, 60)
+    m, s = divmod(rem, 60)
     if h > 0:
         return f"{h}h{m:02d}m{s:02d}s"
     if m > 0:
@@ -58,6 +57,7 @@ def fmt_metric(val: float, width: int = 8, decimals: int = 4) -> str:
 
 # ── EpochSummaryCallback ───────────────────────────────────────────────────
 
+
 class EpochSummaryCallback(L.Callback):
     """
     Prints a per-epoch metrics table to the terminal and saves a results JSON
@@ -80,15 +80,15 @@ class EpochSummaryCallback(L.Callback):
         hparams: dict,
         extra_columns: "callable | None" = None,
     ) -> None:
-        self.output_dir     = Path(output_dir)
-        self.fold_idx       = fold_idx
-        self.task_mode      = task_mode
+        self.output_dir = Path(output_dir)
+        self.fold_idx = fold_idx
+        self.task_mode = task_mode
         self.train_subjects = train_subjects
-        self.val_subjects   = val_subjects
-        self.hparams        = hparams
-        self.extra_columns  = extra_columns
+        self.val_subjects = val_subjects
+        self.hparams = hparams
+        self.extra_columns = extra_columns
         self.epoch_history: list[dict] = []
-        self._fit_start:   float | None = None
+        self._fit_start: float | None = None
         self._epoch_start: float | None = None
 
     def on_fit_start(self, trainer, pl_module) -> None:
@@ -105,21 +105,21 @@ class EpochSummaryCallback(L.Callback):
         if trainer.sanity_checking:
             return
 
-        epoch    = trainer.current_epoch + 1
-        m        = trainer.callback_metrics
-        ep_time  = time.time() - self._epoch_start
-        elapsed  = time.time() - self._fit_start
+        epoch = trainer.current_epoch + 1
+        m = trainer.callback_metrics
+        ep_time = time.time() - self._epoch_start
+        elapsed = time.time() - self._fit_start
 
-        tr_loss  = _v(m.get("train/loss"))
-        tr_acc   = _v(m.get("train/acc"))
-        va_loss  = _v(m.get("val/loss"))
-        va_acc   = _v(m.get("val/acc"))
+        tr_loss = _v(m.get("train/loss"))
+        tr_acc = _v(m.get("train/acc"))
+        va_loss = _v(m.get("val/loss"))
+        va_acc = _v(m.get("val/acc"))
         va_auroc = _v(m.get("val/auroc"))
-        va_f1    = _v(m.get("val/f1"))
+        va_f1 = _v(m.get("val/f1"))
 
-        avg_ep    = elapsed / epoch
+        avg_ep = elapsed / epoch
         remaining = avg_ep * (trainer.max_epochs - epoch)
-        eta_str   = f"ETA {fmt_dur(remaining)}" if epoch < trainer.max_epochs else "done"
+        eta_str = f"ETA {fmt_dur(remaining)}" if epoch < trainer.max_epochs else "done"
 
         extra = ""
         if self.extra_columns is not None:
@@ -132,16 +132,18 @@ class EpochSummaryCallback(L.Callback):
             f"{fmt_metric(va_auroc):>8}  {fmt_metric(va_f1):>7}  ({eta_str}){extra}"
         )
 
-        self.epoch_history.append({
-            "epoch":       epoch,
-            "epoch_time_s": round(ep_time, 2),
-            "train_loss":  None if math.isnan(tr_loss)  else round(tr_loss,  4),
-            "train_acc":   None if math.isnan(tr_acc)   else round(tr_acc,   4),
-            "val_loss":    None if math.isnan(va_loss)  else round(va_loss,  4),
-            "val_acc":     None if math.isnan(va_acc)   else round(va_acc,   4),
-            "val_auroc":   None if math.isnan(va_auroc) else round(va_auroc, 4),
-            "val_f1":      None if math.isnan(va_f1)    else round(va_f1,    4),
-        })
+        self.epoch_history.append(
+            {
+                "epoch": epoch,
+                "epoch_time_s": round(ep_time, 2),
+                "train_loss": None if math.isnan(tr_loss) else round(tr_loss, 4),
+                "train_acc": None if math.isnan(tr_acc) else round(tr_acc, 4),
+                "val_loss": None if math.isnan(va_loss) else round(va_loss, 4),
+                "val_acc": None if math.isnan(va_acc) else round(va_acc, 4),
+                "val_auroc": None if math.isnan(va_auroc) else round(va_auroc, 4),
+                "val_f1": None if math.isnan(va_f1) else round(va_f1, 4),
+            }
+        )
 
     def on_fit_end(self, trainer, pl_module) -> None:
         total_time = time.time() - self._fit_start
@@ -166,21 +168,21 @@ class EpochSummaryCallback(L.Callback):
         best = max(valid_rows, key=lambda r: r["val_acc"]) if valid_rows else {}
 
         results = {
-            "fold":          self.fold_idx,
-            "task_mode":     self.task_mode,
-            "completed_at":  datetime.datetime.now().isoformat(),
-            "hyperparams":   self.hparams,
+            "fold": self.fold_idx,
+            "task_mode": self.task_mode,
+            "completed_at": datetime.datetime.now().isoformat(),
+            "hyperparams": self.hparams,
             "train_subjects": self.train_subjects,
-            "val_subjects":   self.val_subjects,
+            "val_subjects": self.val_subjects,
             "best": {
-                "epoch":     best.get("epoch"),
-                "val_acc":   best.get("val_acc"),
+                "epoch": best.get("epoch"),
+                "val_acc": best.get("val_acc"),
                 "val_auroc": best.get("val_auroc"),
-                "val_f1":    best.get("val_f1"),
+                "val_f1": best.get("val_f1"),
             },
-            "total_time_s":   round(total_time, 2),
+            "total_time_s": round(total_time, 2),
             "epochs_trained": len(self.epoch_history),
-            "epoch_history":  self.epoch_history,
+            "epoch_history": self.epoch_history,
         }
 
         self.output_dir.mkdir(parents=True, exist_ok=True)

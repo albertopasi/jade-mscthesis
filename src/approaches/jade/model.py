@@ -92,7 +92,10 @@ class ReveClassifierJADE(nn.Module):
     # ── Forward ───────────────────────────────────────────────────────
 
     def forward(
-        self, eeg: Tensor, pos: Tensor | None = None, return_projections: bool = False,
+        self,
+        eeg: Tensor,
+        pos: Tensor | None = None,
+        return_projections: bool = False,
     ) -> Tensor | tuple[Tensor, Tensor]:
         """
         Args:
@@ -130,7 +133,7 @@ class ReveClassifierJADE(nn.Module):
 
         # For "no" and "last": compute query attention
         query = self.cls_query_token.expand(B, -1, -1)
-        attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim ** 0.5)
+        attn_scores = torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim**0.5)
         attn_weights = torch.softmax(attn_scores, dim=-1)
         context = torch.matmul(attn_weights, x)  # (B, 1, E)
 
@@ -173,7 +176,7 @@ class ReveClassifierJADE(nn.Module):
             B = x.shape[0]
             query = self.cls_query_token.expand(B, -1, -1)
             attn = torch.softmax(
-                torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim ** 0.5),
+                torch.matmul(query, x.transpose(-1, -2)) / (self.embed_dim**0.5),
                 dim=-1,
             )
             context = torch.matmul(attn, x).squeeze(1)  # (B, E)

@@ -16,9 +16,8 @@ from __future__ import annotations
 import numpy as np
 from sklearn.model_selection import KFold
 
-from src.datasets.thu_ep_dataset import EXCLUDED_SUBJECTS as THU_EP_EXCLUDED
 from src.datasets.faced_dataset import EXCLUDED_SUBJECTS as FACED_EXCLUDED
-
+from src.datasets.thu_ep_dataset import EXCLUDED_SUBJECTS as THU_EP_EXCLUDED
 
 N_FOLDS = 10
 FOLD_RANDOM_STATE = 42
@@ -27,15 +26,15 @@ STIMULUS_SPLIT_SEED = 123
 # Emotion groups: (stimulus index range, 9-class label).
 # Shared between THU-EP and FACED (identical 28-stimulus, 9-emotion structure).
 _EMOTION_GROUPS: list[tuple[range, int]] = [
-    (range(0, 3),   0),   # Anger
-    (range(3, 6),   1),   # Disgust
-    (range(6, 9),   2),   # Fear
-    (range(9, 12),  3),   # Sadness
-    (range(12, 16), 4),   # Neutral
-    (range(16, 19), 5),   # Amusement
-    (range(19, 22), 6),   # Inspiration
-    (range(22, 25), 7),   # Joy
-    (range(25, 28), 8),   # Tenderness
+    (range(0, 3), 0),  # Anger
+    (range(3, 6), 1),  # Disgust
+    (range(6, 9), 2),  # Fear
+    (range(9, 12), 3),  # Sadness
+    (range(12, 16), 4),  # Neutral
+    (range(16, 19), 5),  # Amusement
+    (range(19, 22), 6),  # Inspiration
+    (range(22, 25), 7),  # Joy
+    (range(25, 28), 8),  # Tenderness
 ]
 
 
@@ -90,7 +89,7 @@ def get_stimulus_generalization_split(
 
         rng.shuffle(indices)
         n_train = round(len(indices) * 2 / 3)  # 2 for n=3, 3 for n=4
-        n_train = max(1, n_train)               # safety: at least 1 train
+        n_train = max(1, n_train)  # safety: at least 1 train
 
         train_stim.update(indices[:n_train])
         test_stim.update(indices[n_train:])
@@ -133,6 +132,6 @@ def get_official_split(
         raise ValueError("Official split is only defined for FACED dataset")
     all_subjects = get_all_subjects("faced")
     train = [s for s in all_subjects if s <= 79]
-    val   = [s for s in all_subjects if 80 <= s <= 99]
-    test  = [s for s in all_subjects if s >= 100]
+    val = [s for s in all_subjects if 80 <= s <= 99]
+    test = [s for s in all_subjects if s >= 100]
     return train, val, test

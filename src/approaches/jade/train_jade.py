@@ -56,31 +56,36 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import torch
 from torch.utils.data import DataLoader
+
 import wandb
-
-from src.datasets.folds import (
-    get_all_subjects, get_kfold_splits, get_stimulus_generalization_split,
-    get_official_split, N_FOLDS,
-)
-
-from src.approaches.shared.metrics import evaluate_model
-from src.approaches.shared.dataset import build_raw_dataset
-from src.approaches.shared.training_utils import fmt_dur, COL_W
-from src.approaches.shared.reve import load_reve_and_positions, get_channel_names
-
+from src.approaches.fine_tuning.lora import apply_lora, print_lora_summary
 from src.approaches.jade.config import (
-    JADEConfig, OUTPUT_DIR,
-    USE_WANDB, WANDB_PROJECT, WANDB_ENTITY,
-    DEVICE, NUM_WORKERS, SAMPLING_RATE,
+    DEVICE,
+    NUM_WORKERS,
+    OUTPUT_DIR,
+    SAMPLING_RATE,
+    USE_WANDB,
+    WANDB_ENTITY,
+    WANDB_PROJECT,
+    JADEConfig,
 )
 from src.approaches.jade.model import ReveClassifierJADE
+from src.approaches.jade.summary import print_cross_seed_summary, print_fold_summary
 from src.approaches.jade.training import train_stage_jade
-from src.approaches.jade.summary import print_fold_summary, print_cross_seed_summary
-
-from src.approaches.fine_tuning.lora import apply_lora, print_lora_summary
-
+from src.approaches.shared.dataset import build_raw_dataset
+from src.approaches.shared.metrics import evaluate_model
+from src.approaches.shared.reve import get_channel_names, load_reve_and_positions
+from src.approaches.shared.training_utils import COL_W, fmt_dur
+from src.datasets.folds import (
+    N_FOLDS,
+    get_all_subjects,
+    get_kfold_splits,
+    get_official_split,
+    get_stimulus_generalization_split,
+)
 
 # ── Per-fold runner ───────────────────────────────────────────────────────────
+
 
 def run_fold_jade(
     cfg: JADEConfig,
@@ -110,23 +115,20 @@ def run_fold_jade(
         f"  SupCon: alpha={cfg.supcon_alpha}  tau={cfg.supcon_temperature}  "
         f"repr={cfg.supcon_repr}  proj_dim={cfg.supcon_proj_dim}"
     )
-    print(
-        f"  train: {len(train_subject_ids)} subjects  |  val: {len(val_subject_ids)} subjects"
-    )
+    print(f"  train: {len(train_subject_ids)} subjects  |  val: {len(val_subject_ids)} subjects")
     print(f"{'#' * COL_W}")
 
     # Deep-copy encoder weights so each fold starts from the pretrained state.
     reve_for_fold = copy.deepcopy(reve_model)
-    pos_for_fold  = pos_tensor.clone()
+    pos_for_fold = pos_tensor.clone()
 
     # Build datasets
     t_load = time.time()
     print("Building datasets ...", end="  ", flush=True)
     train_ds = build_raw_dataset(cfg, train_subject_ids, stimulus_filter=train_stimuli)
-    val_ds   = build_raw_dataset(cfg, val_subject_ids, stimulus_filter=val_stimuli)
+    val_ds = build_raw_dataset(cfg, val_subject_ids, stimulus_filter=val_stimuli)
     print(
-        f"done in {fmt_dur(time.time() - t_load)}  "
-        f"(train={len(train_ds):,}  val={len(val_ds):,})"
+        f"done in {fmt_dur(time.time() - t_load)}  (train={len(train_ds):,}  val={len(val_ds):,})"
     )
 
     test_ds = None
@@ -135,11 +137,17 @@ def run_fold_jade(
         print(f"  test={len(test_ds):,} windows")
 
     train_loader = DataLoader(
-        train_ds, batch_size=cfg.batch_size, shuffle=True, num_workers=NUM_WORKERS,
+        train_ds,
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=NUM_WORKERS,
         pin_memory=True,
     )
     val_loader = DataLoader(
-        val_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=NUM_WORKERS,
+        val_ds,
+        batch_size=cfg.batch_size,
+        shuffle=False,
+        num_workers=NUM_WORKERS,
         pin_memory=True,
     )
 
@@ -162,7 +170,8 @@ def run_fold_jade(
     run_name = cfg.run_name(fold_idx, gen_seed)
     if USE_WANDB:
         hparams = cfg.hparams_dict(
-            fold_idx=fold_idx, n_folds=N_FOLDS,
+            fold_idx=fold_idx,
+            n_folds=N_FOLDS,
             n_train_subjects=len(train_subject_ids),
             n_val_subjects=len(val_subject_ids),
             n_train_windows=len(train_ds),
@@ -171,19 +180,26 @@ def run_fold_jade(
             gen_seed=gen_seed,
         )
         wandb.init(
-            project=WANDB_PROJECT, entity=WANDB_ENTITY,
-            name=run_name, group=cfg.group_name(),
-            config=hparams, reinit=True,
+            project=WANDB_PROJECT,
+            entity=WANDB_ENTITY,
+            name=run_name,
+            group=cfg.group_name(),
+            config=hparams,
+            reinit=True,
         )
 
     # ── Stage 1: LP warmup (CE only, no SupCon) ──────────────────────
     model.freeze_encoder()
     model.freeze_projection_head()
     model.set_dropout(cfg.lp_dropout)
-    print(f"\n>>> Stage 1: LP warmup (CE only)  |  trainable params: {model.n_trainable_params():,}")
+    print(
+        f"\n>>> Stage 1: LP warmup (CE only)  |  trainable params: {model.n_trainable_params():,}"
+    )
 
     lp_result = train_stage_jade(
-        model, train_loader, val_loader,
+        model,
+        train_loader,
+        val_loader,
         stage_name="lp",
         lr=cfg.lp_lr,
         max_epochs=cfg.lp_max_epochs,
@@ -212,15 +228,19 @@ def run_fold_jade(
     model.unfreeze_projection_head()
     if cfg.full_ft:
         model.set_dropout(cfg.ft_dropout)
-        print(f"\n>>> Stage 2: Full FT + SupCon  |  trainable params: {model.n_trainable_params():,}")
+        print(
+            f"\n>>> Stage 2: Full FT + SupCon  |  trainable params: {model.n_trainable_params():,}"
+        )
     else:
         apply_lora(model, cfg)
         model.set_dropout(cfg.ft_dropout)
-        print(f"\n>>> Stage 2: LoRA FT + SupCon")
+        print("\n>>> Stage 2: LoRA FT + SupCon")
         print_lora_summary(model)
 
     ft_result = train_stage_jade(
-        model, train_loader, val_loader,
+        model,
+        train_loader,
+        val_loader,
         stage_name="ft",
         lr=cfg.ft_lr,
         max_epochs=cfg.ft_max_epochs,
@@ -252,7 +272,8 @@ def run_fold_jade(
         if cfg.full_ft:
             # Full fine-tuning: save entire state dict (excluding projection head)
             save_state = {
-                k: v.cpu().clone() for k, v in model.state_dict().items()
+                k: v.cpu().clone()
+                for k, v in model.state_dict().items()
                 if not k.startswith("projection_head")
             }
             model_path = ckpt_dir / "full_model.pt"
@@ -266,7 +287,8 @@ def run_fold_jade(
 
             # Save head + cls_query_token (no projection head)
             head_state = {
-                k: v.cpu().clone() for k, v in model.state_dict().items()
+                k: v.cpu().clone()
+                for k, v in model.state_dict().items()
                 if k.startswith("cls_query_token") or k.startswith("linear_head")
             }
             head_path = ckpt_dir / "head_weights.pt"
@@ -275,7 +297,8 @@ def run_fold_jade(
 
         # Optionally save projection head for analysis
         proj_state = {
-            k: v.cpu().clone() for k, v in model.state_dict().items()
+            k: v.cpu().clone()
+            for k, v in model.state_dict().items()
             if k.startswith("projection_head")
         }
         proj_path = ckpt_dir / "projection_head.pt"
@@ -303,13 +326,19 @@ def run_fold_jade(
     test_metrics = None
     if test_ds is not None:
         test_loader = DataLoader(
-            test_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=NUM_WORKERS,
+            test_ds,
+            batch_size=cfg.batch_size,
+            shuffle=False,
+            num_workers=NUM_WORKERS,
             pin_memory=True,
         )
         print(f"\n>>> Test evaluation ({len(test_ds):,} windows)")
         test_metrics = evaluate_model(
-            model, test_loader, device=DEVICE,
-            n_classes=cfg.num_classes, use_amp=cfg.use_amp,
+            model,
+            test_loader,
+            device=DEVICE,
+            n_classes=cfg.num_classes,
+            use_amp=cfg.use_amp,
         )
         print(
             f"  test_acc={test_metrics['accuracy']:.4f}  "
@@ -320,20 +349,22 @@ def run_fold_jade(
 
     if USE_WANDB:
         best_log = {
-            "best/train_loss":  ft_result.get("train_loss"),
-            "best/val_loss":    ft_result.get("val_loss"),
-            "best/val_acc":     ft_result.get("val_acc"),
+            "best/train_loss": ft_result.get("train_loss"),
+            "best/val_loss": ft_result.get("val_loss"),
+            "best/val_acc": ft_result.get("val_acc"),
             "best/val_bal_acc": ft_result.get("val_bal_acc"),
-            "best/val_auroc":   ft_result.get("val_auroc"),
-            "best/val_f1":      ft_result.get("val_f1"),
+            "best/val_auroc": ft_result.get("val_auroc"),
+            "best/val_f1": ft_result.get("val_f1"),
         }
         if test_metrics is not None:
-            best_log.update({
-                "test/acc":     test_metrics["accuracy"],
-                "test/bal_acc": test_metrics["balanced_acc"],
-                "test/auroc":   test_metrics["auroc"],
-                "test/f1":      test_metrics["f1_weighted"],
-            })
+            best_log.update(
+                {
+                    "test/acc": test_metrics["accuracy"],
+                    "test/bal_acc": test_metrics["balanced_acc"],
+                    "test/auroc": test_metrics["auroc"],
+                    "test/f1": test_metrics["f1_weighted"],
+                }
+            )
         wandb.log(best_log)
         wandb.finish()
 
@@ -347,31 +378,34 @@ def run_fold_jade(
         torch.cuda.empty_cache()
 
     result = {
-        "fold":              fold_idx,
-        "train_loss":        ft_result.get("train_loss"),
-        "val_loss":          ft_result.get("val_loss"),
-        "val_acc":           ft_result.get("val_acc"),
-        "val_bal_acc":       ft_result.get("val_bal_acc"),
-        "val_auroc":         ft_result.get("val_auroc"),
-        "val_f1":            ft_result.get("val_f1"),
-        "best_epoch":        ft_result.get("best_epoch"),
+        "fold": fold_idx,
+        "train_loss": ft_result.get("train_loss"),
+        "val_loss": ft_result.get("val_loss"),
+        "val_acc": ft_result.get("val_acc"),
+        "val_bal_acc": ft_result.get("val_bal_acc"),
+        "val_auroc": ft_result.get("val_auroc"),
+        "val_f1": ft_result.get("val_f1"),
+        "best_epoch": ft_result.get("best_epoch"),
         "lp_epochs_trained": lp_epochs,
         "ft_epochs_trained": ft_result.get("epochs_trained"),
-        "lp_train_loss":     lp_result.get("train_loss"),
-        "lp_val_acc":        lp_result.get("val_acc"),
-        "ckpt_dir":          ckpt_dir,
+        "lp_train_loss": lp_result.get("train_loss"),
+        "lp_val_acc": lp_result.get("val_acc"),
+        "ckpt_dir": ckpt_dir,
     }
     if test_metrics is not None:
-        result.update({
-            "test_acc":     test_metrics["accuracy"],
-            "test_bal_acc": test_metrics["balanced_acc"],
-            "test_auroc":   test_metrics["auroc"],
-            "test_f1":      test_metrics["f1_weighted"],
-        })
+        result.update(
+            {
+                "test_acc": test_metrics["accuracy"],
+                "test_bal_acc": test_metrics["balanced_acc"],
+                "test_auroc": test_metrics["auroc"],
+                "test_f1": test_metrics["f1_weighted"],
+            }
+        )
     return result
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
+
 
 def parse_args() -> JADEConfig:
     _d = JADEConfig()  # single source of truth for all defaults
@@ -383,69 +417,128 @@ def parse_args() -> JADEConfig:
     )
 
     parser.add_argument("--dataset", choices=["faced", "thu-ep"], default=_d.dataset)
-    parser.add_argument("--task", choices=["binary", "9-class"], default=_d.task_mode,
-                        help="Classification task")
-    parser.add_argument("--fold", type=int, default=None, metavar="N",
-                        help="Run only this fold (1-10). Omit for all folds.")
+    parser.add_argument(
+        "--task", choices=["binary", "9-class"], default=_d.task_mode, help="Classification task"
+    )
+    parser.add_argument(
+        "--fold",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Run only this fold (1-10). Omit for all folds.",
+    )
 
     # FT mode
-    parser.add_argument("--fullft", action="store_true", default=_d.full_ft,
-                        help="Full fine-tuning (no LoRA)")
-    parser.add_argument("--revesplit", action="store_true", default=_d.reve_split,
-                        help="Official REVE split: train 0-79, val 80-99, test 100-122 (FACED only)")
+    parser.add_argument(
+        "--fullft", action="store_true", default=_d.full_ft, help="Full fine-tuning (no LoRA)"
+    )
+    parser.add_argument(
+        "--revesplit",
+        action="store_true",
+        default=_d.reve_split,
+        help="Official REVE split: train 0-79, val 80-99, test 100-122 (FACED only)",
+    )
 
     # Pooling
     parser.add_argument("--pooling", choices=["no", "last", "last_avg"], default=_d.pooling)
 
     # Window
-    parser.add_argument("--window", type=float, default=_w, metavar="S",
-                        help=f"Window length in seconds (default: {_w})")
-    parser.add_argument("--stride", type=float, default=_st, metavar="S",
-                        help=f"Stride in seconds (default: {_st})")
+    parser.add_argument(
+        "--window",
+        type=float,
+        default=_w,
+        metavar="S",
+        help=f"Window length in seconds (default: {_w})",
+    )
+    parser.add_argument(
+        "--stride", type=float, default=_st, metavar="S", help=f"Stride in seconds (default: {_st})"
+    )
 
     # Shared training
     parser.add_argument("--batch-size", type=int, default=_d.batch_size)
-    parser.add_argument("--no-amp", dest="use_amp", action="store_false",
-                        default=_d.use_amp, help="Disable mixed precision")
+    parser.add_argument(
+        "--no-amp",
+        dest="use_amp",
+        action="store_false",
+        default=_d.use_amp,
+        help="Disable mixed precision",
+    )
 
     # LP stage
-    parser.add_argument("--lp-epochs", type=int, default=_d.lp_max_epochs,
-                        help=f"LP max epochs (default: {_d.lp_max_epochs})")
-    parser.add_argument("--lp-lr", type=float, default=_d.lp_lr,
-                        help=f"LP learning rate (default: {_d.lp_lr})")
+    parser.add_argument(
+        "--lp-epochs",
+        type=int,
+        default=_d.lp_max_epochs,
+        help=f"LP max epochs (default: {_d.lp_max_epochs})",
+    )
+    parser.add_argument(
+        "--lp-lr", type=float, default=_d.lp_lr, help=f"LP learning rate (default: {_d.lp_lr})"
+    )
 
     # FT stage
-    parser.add_argument("--ft-epochs", type=int, default=_d.ft_max_epochs,
-                        help=f"FT max epochs (default: {_d.ft_max_epochs})")
-    parser.add_argument("--ft-lr", type=float, default=_d.ft_lr,
-                        help=f"FT learning rate (default: {_d.ft_lr})")
+    parser.add_argument(
+        "--ft-epochs",
+        type=int,
+        default=_d.ft_max_epochs,
+        help=f"FT max epochs (default: {_d.ft_max_epochs})",
+    )
+    parser.add_argument(
+        "--ft-lr", type=float, default=_d.ft_lr, help=f"FT learning rate (default: {_d.ft_lr})"
+    )
 
     # LoRA
-    parser.add_argument("--lora-rank", type=int, default=_d.lora_rank,
-                        help=f"LoRA rank (default: {_d.lora_rank})")
-    parser.add_argument("--lora-alpha", type=int, default=None,
-                        help="LoRA alpha (default: same as rank)")
-    parser.add_argument("--lora-target", choices=["attention", "attention+ffn"],
-                        default=_d.lora_target)
+    parser.add_argument(
+        "--lora-rank", type=int, default=_d.lora_rank, help=f"LoRA rank (default: {_d.lora_rank})"
+    )
+    parser.add_argument(
+        "--lora-alpha", type=int, default=None, help="LoRA alpha (default: same as rank)"
+    )
+    parser.add_argument(
+        "--lora-target", choices=["attention", "attention+ffn"], default=_d.lora_target
+    )
 
     # SupCon
-    parser.add_argument("--alpha", type=float, default=_d.supcon_alpha,
-                        help=f"CE weight in joint loss: L = alpha*CE + (1-alpha)*SupCon (default: {_d.supcon_alpha})")
-    parser.add_argument("--temperature", type=float, default=_d.supcon_temperature,
-                        help=f"SupCon temperature tau (default: {_d.supcon_temperature})")
-    parser.add_argument("--proj-dim", type=int, default=_d.supcon_proj_dim,
-                        help=f"Projection head output dim (default: {_d.supcon_proj_dim})")
-    parser.add_argument("--proj-hidden", type=int, default=_d.supcon_proj_hidden,
-                        help=f"Projection head hidden dim (default: {_d.supcon_proj_hidden})")
-    parser.add_argument("--supcon-repr", choices=["context", "mean", "both"],
-                        default=_d.supcon_repr,
-                        help=f"Representation for projection head (default: {_d.supcon_repr})")
+    parser.add_argument(
+        "--alpha",
+        type=float,
+        default=_d.supcon_alpha,
+        help=f"CE weight in joint loss: L = alpha*CE + (1-alpha)*SupCon (default: {_d.supcon_alpha})",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=_d.supcon_temperature,
+        help=f"SupCon temperature tau (default: {_d.supcon_temperature})",
+    )
+    parser.add_argument(
+        "--proj-dim",
+        type=int,
+        default=_d.supcon_proj_dim,
+        help=f"Projection head output dim (default: {_d.supcon_proj_dim})",
+    )
+    parser.add_argument(
+        "--proj-hidden",
+        type=int,
+        default=_d.supcon_proj_hidden,
+        help=f"Projection head hidden dim (default: {_d.supcon_proj_hidden})",
+    )
+    parser.add_argument(
+        "--supcon-repr",
+        choices=["context", "mean", "both"],
+        default=_d.supcon_repr,
+        help=f"Representation for projection head (default: {_d.supcon_repr})",
+    )
 
     # Generalization
-    parser.add_argument("--generalization", action="store_true", default=_d.generalization,
-                        help="Stimulus-generalization evaluation")
-    parser.add_argument("--gen-seeds", type=int, nargs="+", default=_d.gen_seeds,
-                        help="Seeds for stimulus splits")
+    parser.add_argument(
+        "--generalization",
+        action="store_true",
+        default=_d.generalization,
+        help="Stimulus-generalization evaluation",
+    )
+    parser.add_argument(
+        "--gen-seeds", type=int, nargs="+", default=_d.gen_seeds, help="Seeds for stimulus splits"
+    )
 
     args = parser.parse_args()
 
@@ -488,11 +581,14 @@ def parse_args() -> JADEConfig:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     import multiprocessing
+
     multiprocessing.set_start_method("fork", force=True)
 
     import lightning as L
+
     L.seed_everything(42, workers=True)
 
     cfg = parse_args()
@@ -536,8 +632,12 @@ def main() -> None:
         )
 
         result = run_fold_jade(
-            cfg, 1, train_subjects, val_subjects,
-            reve_model, pos_tensor,
+            cfg,
+            1,
+            train_subjects,
+            val_subjects,
+            reve_model,
+            pos_tensor,
             test_subject_ids=test_subjects,
         )
 
@@ -612,7 +712,9 @@ def main() -> None:
             gen_seed = seed
             train_stimuli, val_stimuli = get_stimulus_generalization_split(cfg.task_mode, seed=seed)
             print(f"\n{'=' * COL_W}")
-            print(f"  SEED {seed}  |  {len(train_stimuli)} train stimuli, {len(val_stimuli)} held-out")
+            print(
+                f"  SEED {seed}  |  {len(train_stimuli)} train stimuli, {len(val_stimuli)} held-out"
+            )
             print(f"{'=' * COL_W}")
 
         fold_results: list[dict] = []
@@ -621,12 +723,17 @@ def main() -> None:
 
         for fold_idx, (train_idx, val_idx) in folds_to_run:
             train_subjects = [all_subjects[i] for i in train_idx]
-            val_subjects   = [all_subjects[i] for i in val_idx]
+            val_subjects = [all_subjects[i] for i in val_idx]
 
             result = run_fold_jade(
-                cfg, fold_idx, train_subjects, val_subjects,
-                reve_model, pos_tensor,
-                train_stimuli=train_stimuli, val_stimuli=val_stimuli,
+                cfg,
+                fold_idx,
+                train_subjects,
+                val_subjects,
+                reve_model,
+                pos_tensor,
+                train_stimuli=train_stimuli,
+                val_stimuli=val_stimuli,
                 gen_seed=gen_seed,
             )
             fold_results.append(result)
@@ -641,27 +748,37 @@ def main() -> None:
                         print(f"  [ckpt] Removed previous best: {best_ckpt_dir.name}")
                     best_ckpt_acc = fold_acc
                     best_ckpt_dir = fold_ckpt
-                    print(f"  [ckpt] New best: fold {fold_idx}  val_acc={fold_acc:.4f}  → {fold_ckpt.name}")
+                    print(
+                        f"  [ckpt] New best: fold {fold_idx}  val_acc={fold_acc:.4f}  → {fold_ckpt.name}"
+                    )
                 else:
                     shutil.rmtree(fold_ckpt)
                     print(f"  [ckpt] Removed (not best, val_acc={fold_acc:.4f}): {fold_ckpt.name}")
 
         if len(fold_results) > 1:
-            print_fold_summary(cfg, [{k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results], gen_seed=gen_seed)
+            print_fold_summary(
+                cfg,
+                [{k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results],
+                gen_seed=gen_seed,
+            )
 
         if gen_seed is not None:
-            accs     = [r["val_acc"]     for r in fold_results if r.get("val_acc")     is not None]
+            accs = [r["val_acc"] for r in fold_results if r.get("val_acc") is not None]
             bal_accs = [r["val_bal_acc"] for r in fold_results if r.get("val_bal_acc") is not None]
-            aurocs   = [r["val_auroc"]   for r in fold_results if r.get("val_auroc")   is not None]
-            f1s      = [r["val_f1"]      for r in fold_results if r.get("val_f1")      is not None]
-            seed_summaries.append({
-                "seed":         gen_seed,
-                "mean_acc":     round(statistics.mean(accs),     4) if accs     else None,
-                "mean_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
-                "mean_auroc":   round(statistics.mean(aurocs),   4) if aurocs   else None,
-                "mean_f1":      round(statistics.mean(f1s),      4) if f1s      else None,
-                "folds":        [{k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results],
-            })
+            aurocs = [r["val_auroc"] for r in fold_results if r.get("val_auroc") is not None]
+            f1s = [r["val_f1"] for r in fold_results if r.get("val_f1") is not None]
+            seed_summaries.append(
+                {
+                    "seed": gen_seed,
+                    "mean_acc": round(statistics.mean(accs), 4) if accs else None,
+                    "mean_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
+                    "mean_auroc": round(statistics.mean(aurocs), 4) if aurocs else None,
+                    "mean_f1": round(statistics.mean(f1s), 4) if f1s else None,
+                    "folds": [
+                        {k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results
+                    ],
+                }
+            )
 
     # Cleanup
     del reve_model, pos_tensor

@@ -13,7 +13,6 @@ import math
 import statistics
 from pathlib import Path
 
-
 COL_W = 90
 
 
@@ -125,7 +124,9 @@ def print_fold_summary(
             "val_f1": round(statistics.mean(f1s), 4) if f1s else None,
         },
         "std": {
-            "train_loss": round(statistics.stdev(train_losses), 4) if len(train_losses) > 1 else 0.0,
+            "train_loss": round(statistics.stdev(train_losses), 4)
+            if len(train_losses) > 1
+            else 0.0,
             "val_acc": round(statistics.stdev(accs), 4) if len(accs) > 1 else 0.0,
             "val_bal_acc": round(statistics.stdev(bal_accs), 4) if len(bal_accs) > 1 else 0.0,
             "val_auroc": round(statistics.stdev(aurocs), 4) if len(aurocs) > 1 else 0.0,
@@ -173,10 +174,7 @@ def print_cross_seed_summary(
         if f1 is not None:
             f1s.append(f1)
         print(
-            f"{s['seed']:>6}  "
-            f"{fmt_metric(acc):>9}  "
-            f"{fmt_metric(bal_acc):>11}  "
-            f"{fmt_metric(f1):>9}"
+            f"{s['seed']:>6}  {fmt_metric(acc):>9}  {fmt_metric(bal_acc):>11}  {fmt_metric(f1):>9}"
         )
 
     print("-" * len(col))

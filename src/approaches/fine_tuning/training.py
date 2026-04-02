@@ -14,11 +14,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-import wandb
 
+import wandb
 from src.approaches.shared.metrics import evaluate_model
 from src.approaches.shared.stable_adamw import StableAdamW
-from src.approaches.shared.training_utils import _get_exponential_warmup_lambda, fmt_dur, COL_W
+from src.approaches.shared.training_utils import COL_W, _get_exponential_warmup_lambda, fmt_dur
 
 
 class _PatienceMonitor:
@@ -75,11 +75,15 @@ def train_stage(
 
     warmup_steps = warmup_epochs * len(train_loader)
     warmup_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lr_lambda=_get_exponential_warmup_lambda(warmup_steps),
+        optimizer,
+        lr_lambda=_get_exponential_warmup_lambda(warmup_steps),
     )
 
     reduce_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="max", factor=0.5, patience=scheduler_patience,
+        optimizer,
+        mode="max",
+        factor=0.5,
+        patience=scheduler_patience,
     )
 
     scaler = torch.amp.GradScaler()
@@ -90,7 +94,9 @@ def train_stage(
     best_state = None
 
     print(f"\n{'─' * COL_W}")
-    print(f"  Stage: {stage_name}  |  lr={lr}  |  max_epochs={max_epochs}  |  grad_clip={grad_clip}")
+    print(
+        f"  Stage: {stage_name}  |  lr={lr}  |  max_epochs={max_epochs}  |  grad_clip={grad_clip}"
+    )
     header = (
         f"{'Epoch':>6}  {'EpTime':>7}  {'Elapsed':>8}  "
         f"{'TrLoss':>8}  {'TrAcc':>7}  {'VaAcc':>7}  {'VaBalAcc':>9}  "
@@ -123,7 +129,9 @@ def train_stage(
                     mm = random.random()
                     perm = torch.randperm(eeg.size(0), device=device)
                     output = model(mm * eeg + (1 - mm) * eeg[perm])
-                    loss = mm * F.cross_entropy(output, target) + (1 - mm) * F.cross_entropy(output, target[perm])
+                    loss = mm * F.cross_entropy(output, target) + (1 - mm) * F.cross_entropy(
+                        output, target[perm]
+                    )
                 else:
                     output = model(eeg)
                     loss = F.cross_entropy(output, target)
@@ -151,8 +159,11 @@ def train_stage(
 
         # ── Validate ───────────────────────────────────────────────────
         metrics = evaluate_model(
-            model, val_loader, device=device,
-            n_classes=n_classes, use_amp=use_amp,
+            model,
+            val_loader,
+            device=device,
+            n_classes=n_classes,
+            use_amp=use_amp,
         )
 
         val_acc = metrics["accuracy"]
@@ -169,15 +180,10 @@ def train_stage(
             if save_trainable_only:
                 trainable_keys = {n for n, p in model.named_parameters() if p.requires_grad}
                 best_state = {
-                    k: v.cpu().clone()
-                    for k, v in model.state_dict().items()
-                    if k in trainable_keys
+                    k: v.cpu().clone() for k, v in model.state_dict().items() if k in trainable_keys
                 }
             else:
-                best_state = {
-                    k: v.cpu().clone()
-                    for k, v in model.state_dict().items()
-                }
+                best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
 
         # Print epoch summary
         ep_time = time.time() - epoch_start
@@ -188,7 +194,7 @@ def train_stage(
         eta = f"ETA {fmt_dur(remaining)}" if epoch + 1 < max_epochs else "done"
 
         print(
-            f"{epoch+1:>6}  {fmt_dur(ep_time):>7}  {fmt_dur(elapsed):>8}  "
+            f"{epoch + 1:>6}  {fmt_dur(ep_time):>7}  {fmt_dur(elapsed):>8}  "
             f"{avg_loss:>8.4f}  {train_acc:>7.4f}  {val_acc:>7.4f}  {metrics['balanced_acc']:>9.4f}  "
             f"{metrics['auroc']:>8.4f}  {metrics['f1_weighted']:>7.4f}  "
             f"{current_lr:>10.2e}  ({eta})"
@@ -196,17 +202,20 @@ def train_stage(
 
         # W&B per-epoch logging (train/ and val/ sections, like LP)
         if wandb.run is not None:
-            wandb.log({
-                "train/loss":    avg_loss,
-                "train/acc":     train_acc,
-                "val/loss":      metrics.get("val_loss"),
-                "val/acc":       val_acc,
-                "val/bal_acc":   metrics["balanced_acc"],
-                "val/auroc":     metrics["auroc"],
-                "val/f1":        metrics["f1_weighted"],
-                "lr":            current_lr,
-                "stage":         0 if stage_name == "lp" else 1,
-            }, step=wandb_epoch_offset + epoch + 1)
+            wandb.log(
+                {
+                    "train/loss": avg_loss,
+                    "train/acc": train_acc,
+                    "val/loss": metrics.get("val_loss"),
+                    "val/acc": val_acc,
+                    "val/bal_acc": metrics["balanced_acc"],
+                    "val/auroc": metrics["auroc"],
+                    "val/f1": metrics["f1_weighted"],
+                    "lr": current_lr,
+                    "stage": 0 if stage_name == "lp" else 1,
+                },
+                step=wandb_epoch_offset + epoch + 1,
+            )
 
         # Early stopping on accuracy
         if patience_monitor(val_acc):
@@ -222,13 +231,13 @@ def train_stage(
     print(f"{'─' * COL_W}")
 
     return {
-        "val_acc":        best_metrics.get("accuracy"),
-        "val_bal_acc":    best_metrics.get("balanced_acc"),
-        "val_auroc":      best_metrics.get("auroc"),
-        "val_f1":         best_metrics.get("f1_weighted"),
-        "train_loss":     best_metrics.get("train_loss"),
-        "val_loss":       best_metrics.get("val_loss"),
-        "best_epoch":     best_metrics.get("epoch"),
+        "val_acc": best_metrics.get("accuracy"),
+        "val_bal_acc": best_metrics.get("balanced_acc"),
+        "val_auroc": best_metrics.get("auroc"),
+        "val_f1": best_metrics.get("f1_weighted"),
+        "train_loss": best_metrics.get("train_loss"),
+        "val_loss": best_metrics.get("val_loss"),
+        "best_epoch": best_metrics.get("epoch"),
         "epochs_trained": last_epoch + 1,
-        "best_state":     best_state,
+        "best_state": best_state,
     }

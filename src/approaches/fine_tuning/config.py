@@ -14,11 +14,7 @@ from pathlib import Path
 from src.approaches.shared.config import (
     DATA_ROOTS,
     DATASET_DEFAULTS,
-    DEVICE,
-    NUM_WORKERS,
     PROJECT_ROOT,
-    REVE_MODEL_PATH,
-    REVE_POS_PATH,
     SAMPLING_RATE,
 )
 
@@ -28,9 +24,9 @@ OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ft_checkpoints"
 
 # ── W&B ───────────────────────────────────────────────────────────────────────
 
-USE_WANDB     = True
+USE_WANDB = True
 WANDB_PROJECT = "eeg-ft-v2"
-WANDB_ENTITY  = "zl-tudelft-thesis"
+WANDB_ENTITY = "zl-tudelft-thesis"
 
 
 @dataclass
@@ -45,11 +41,11 @@ class FTConfig:
     gen_seeds: list[int] = field(default_factory=lambda: [123, 456, 789])
 
     # Window
-    window_size: int = 2000    # 10 s at 200 Hz
-    stride: int = 2000         # non-overlapping
+    window_size: int = 2000  # 10 s at 200 Hz
+    stride: int = 2000  # non-overlapping
 
     # Pooling
-    pooling: str = "no"        # "no", "last", "last_avg"
+    pooling: str = "no"  # "no", "last", "last_avg"
 
     # Shared training
     batch_size: int = 64
@@ -78,13 +74,13 @@ class FTConfig:
 
     # ── LoRA ───────────────────────────────────────────────────────────
     lora_rank: int = 16
-    lora_alpha: int = 16          # match rank (official default)
-    lora_dropout: float = 0.0     # official uses no LoRA dropout
+    lora_alpha: int = 16  # match rank (official default)
+    lora_dropout: float = 0.0  # official uses no LoRA dropout
     lora_target: str = "attention"  # "attention" only for now
 
     # ── Optional mode flags ───────────────────────────────────────────
-    full_ft: bool = False          # True → full fine-tuning (no LoRA)
-    reve_split: bool = False       # True → fixed train/val/test (FACED only)
+    full_ft: bool = False  # True → full fine-tuning (no LoRA)
+    reve_split: bool = False  # True → fixed train/val/test (FACED only)
 
     # ── Derived helpers ────────────────────────────────────────────────
 
@@ -102,7 +98,7 @@ class FTConfig:
 
     @property
     def window_tag(self) -> str:
-        w_s  = round(self.window_size / SAMPLING_RATE)
+        w_s = round(self.window_size / SAMPLING_RATE)
         st_s = round(self.stride / SAMPLING_RATE)
         return f"w{w_s}s{st_s}"
 
@@ -152,46 +148,46 @@ class FTConfig:
         gen_seed: int | None = None,
     ) -> dict:
         return {
-            "dataset":               self.dataset,
-            "task_mode":             self.task_mode,
-            "fold":                  fold_idx,
-            "n_folds":               n_folds,
-            "batch_size":            self.batch_size,
-            "weight_decay":          self.weight_decay,
-            "window_size":           self.window_size,
-            "stride":                self.stride,
-            "pooling":               self.pooling,
-            "n_train_subjects":      n_train_subjects,
-            "n_val_subjects":        n_val_subjects,
-            "n_train_windows":       n_train_windows,
-            "n_val_windows":         n_val_windows,
-            "embed_dim":             embed_dim,
-            "generalization":        self.generalization,
-            "gen_seed":              gen_seed,
-            "use_mixup":             self.use_mixup,
-            "use_amp":               self.use_amp,
-            "scale_factor":          self.scale_factor,
-            "full_ft":               self.full_ft,
-            "reve_split":            self.reve_split,
+            "dataset": self.dataset,
+            "task_mode": self.task_mode,
+            "fold": fold_idx,
+            "n_folds": n_folds,
+            "batch_size": self.batch_size,
+            "weight_decay": self.weight_decay,
+            "window_size": self.window_size,
+            "stride": self.stride,
+            "pooling": self.pooling,
+            "n_train_subjects": n_train_subjects,
+            "n_val_subjects": n_val_subjects,
+            "n_train_windows": n_train_windows,
+            "n_val_windows": n_val_windows,
+            "embed_dim": embed_dim,
+            "generalization": self.generalization,
+            "gen_seed": gen_seed,
+            "use_mixup": self.use_mixup,
+            "use_amp": self.use_amp,
+            "scale_factor": self.scale_factor,
+            "full_ft": self.full_ft,
+            "reve_split": self.reve_split,
             # LP stage
-            "lp_max_epochs":         self.lp_max_epochs,
-            "lp_lr":                 self.lp_lr,
-            "lp_dropout":            self.lp_dropout,
-            "lp_warmup_epochs":      self.lp_warmup_epochs,
+            "lp_max_epochs": self.lp_max_epochs,
+            "lp_lr": self.lp_lr,
+            "lp_dropout": self.lp_dropout,
+            "lp_warmup_epochs": self.lp_warmup_epochs,
             "lp_scheduler_patience": self.lp_scheduler_patience,
             "lp_early_stop_patience": self.lp_early_stop_patience,
-            "lp_grad_clip":          self.lp_grad_clip,
+            "lp_grad_clip": self.lp_grad_clip,
             # FT stage
-            "ft_max_epochs":         self.ft_max_epochs,
-            "ft_lr":                 self.ft_lr,
-            "ft_dropout":            self.ft_dropout,
-            "ft_warmup_epochs":      self.ft_warmup_epochs,
+            "ft_max_epochs": self.ft_max_epochs,
+            "ft_lr": self.ft_lr,
+            "ft_dropout": self.ft_dropout,
+            "ft_warmup_epochs": self.ft_warmup_epochs,
             "ft_scheduler_patience": self.ft_scheduler_patience,
             "ft_early_stop_patience": self.ft_early_stop_patience,
-            "ft_grad_clip":          self.ft_grad_clip,
+            "ft_grad_clip": self.ft_grad_clip,
             # LoRA
-            "lora_rank":             self.lora_rank,
-            "lora_alpha":            self.lora_alpha,
-            "lora_dropout":          self.lora_dropout,
-            "lora_target":           self.lora_target,
+            "lora_rank": self.lora_rank,
+            "lora_alpha": self.lora_alpha,
+            "lora_dropout": self.lora_dropout,
+            "lora_target": self.lora_target,
         }

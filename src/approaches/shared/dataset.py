@@ -17,6 +17,7 @@ def build_raw_dataset(
     """Build a raw EEG window dataset for the given subjects and config."""
     if cfg.dataset == "faced":
         from src.datasets.faced_dataset import FACEDWindowDataset
+
         return FACEDWindowDataset(
             subject_ids=subject_ids,
             task_mode=cfg.task_mode,
@@ -28,6 +29,7 @@ def build_raw_dataset(
         )
     else:
         from src.datasets.thu_ep_dataset import THUEPWindowDataset
+
         return THUEPWindowDataset(
             subject_ids=subject_ids,
             task_mode=cfg.task_mode,

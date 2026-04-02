@@ -9,13 +9,13 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 from sklearn.metrics import (
+    average_precision_score,
     balanced_accuracy_score,
     f1_score,
     roc_auc_score,
-    average_precision_score,
 )
+from torch.utils.data import DataLoader
 
 
 @torch.no_grad()

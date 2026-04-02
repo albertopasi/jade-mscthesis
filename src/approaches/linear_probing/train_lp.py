@@ -24,7 +24,7 @@ Run with:
     # Generalization mode
     uv run python -m src.approaches.linear_probing.train_lp --dataset faced --task binary --generalization
 
-    CUDA_VISIBLE_DEVICES=1 uv run python -m src.approaches.linear_probing.train_lp --dataset faced --task 9-class --pooling last 
+    CUDA_VISIBLE_DEVICES=1 uv run python -m src.approaches.linear_probing.train_lp --dataset faced --task 9-class --pooling last
 """
 
 from __future__ import annotations
@@ -41,43 +41,57 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import lightning as L
 import torch
 import torch.nn.functional as F
+from lightning.pytorch.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from torch.utils.data import DataLoader, TensorDataset
-import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, Callback
-from lightning.pytorch.loggers import WandbLogger, CSVLogger
+
 import wandb
-
-from src.datasets.folds import (
-    get_all_subjects, get_kfold_splits, get_stimulus_generalization_split, N_FOLDS,
-)
-
-from src.approaches.linear_probing.model import (
-    ReveClassifierLP, EmbeddingExtractor, LinearProber, evaluate_model,
-)
-from src.approaches.shared.reve import load_reve_and_positions, get_channel_names
 from src.approaches.linear_probing.config import (
-    LPConfig, OUTPUT_DIR,
-    USE_WANDB, WANDB_PROJECT, WANDB_ENTITY,
-    SAMPLING_RATE, DEVICE, ACCELERATOR, NUM_WORKERS,
+    ACCELERATOR,
+    DEVICE,
+    NUM_WORKERS,
+    OUTPUT_DIR,
+    SAMPLING_RATE,
+    USE_WANDB,
+    WANDB_ENTITY,
+    WANDB_PROJECT,
+    LPConfig,
 )
-from src.approaches.shared.stable_adamw import StableAdamW
-from src.approaches.shared.training_utils import fmt_dur, COL_W, _get_exponential_warmup_lambda
-from src.approaches.shared.dataset import build_raw_dataset
+from src.approaches.linear_probing.model import (
+    EmbeddingExtractor,
+    LinearProber,
+    ReveClassifierLP,
+    evaluate_model,
+)
 from src.approaches.linear_probing.summary import (
-    print_fold_summary, print_cross_seed_summary,
+    print_cross_seed_summary,
+    print_fold_summary,
+)
+from src.approaches.shared.dataset import build_raw_dataset
+from src.approaches.shared.reve import get_channel_names, load_reve_and_positions
+from src.approaches.shared.stable_adamw import StableAdamW
+from src.approaches.shared.training_utils import COL_W, _get_exponential_warmup_lambda, fmt_dur
+from src.datasets.folds import (
+    N_FOLDS,
+    get_all_subjects,
+    get_kfold_splits,
+    get_stimulus_generalization_split,
 )
 
 
 def fmt_metric(val: float, decimals: int = 4) -> str:
     import math
+
     if math.isnan(val):
         return "n/a"
     return f"{val:.{decimals}f}"
 
 
 # ── Patience monitor ─────────────────────────────────────
+
 
 class PatienceMonitor:
     """Monitor validation accuracy with early stopping."""
@@ -98,6 +112,7 @@ class PatienceMonitor:
 
 
 # ── Official-mode training loop ──────────────────────────────────────────────
+
 
 def train_official_mode(
     cfg: LPConfig,
@@ -125,12 +140,16 @@ def train_official_mode(
     # Warmup scheduler (step-level, exponential)
     warmup_steps = cfg.warmup_epochs * len(train_loader)
     warmup_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lr_lambda=_get_exponential_warmup_lambda(warmup_steps),
+        optimizer,
+        lr_lambda=_get_exponential_warmup_lambda(warmup_steps),
     )
 
     # ReduceLROnPlateau (epoch-level, on validation accuracy)
     reduce_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="max", factor=0.5, patience=cfg.scheduler_patience,
+        optimizer,
+        mode="max",
+        factor=0.5,
+        patience=cfg.scheduler_patience,
     )
 
     scaler = torch.amp.GradScaler()
@@ -172,7 +191,9 @@ def train_official_mode(
                     mm = random.random()
                     perm = torch.randperm(eeg.size(0), device=device)
                     output = model(mm * eeg + (1 - mm) * eeg[perm])
-                    loss = mm * F.cross_entropy(output, target) + (1 - mm) * F.cross_entropy(output, target[perm])
+                    loss = mm * F.cross_entropy(output, target) + (1 - mm) * F.cross_entropy(
+                        output, target[perm]
+                    )
                 else:
                     output = model(eeg)
                     loss = F.cross_entropy(output, target)
@@ -202,8 +223,11 @@ def train_official_mode(
 
         # ── Validate ───────────────────────────────────────────────────
         metrics = evaluate_model(
-            model, val_loader, device=device,
-            n_classes=cfg.num_classes, use_amp=cfg.use_amp,
+            model,
+            val_loader,
+            device=device,
+            n_classes=cfg.num_classes,
+            use_amp=cfg.use_amp,
         )
 
         val_acc = metrics["accuracy"]
@@ -213,8 +237,11 @@ def train_official_mode(
         if val_acc > best_acc:
             best_acc = val_acc
             best_metrics = {**metrics, "epoch": epoch + 1}
-            best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()
-                          if k.startswith("cls_query_token") or k.startswith("linear_head")}
+            best_state = {
+                k: v.cpu().clone()
+                for k, v in model.state_dict().items()
+                if k.startswith("cls_query_token") or k.startswith("linear_head")
+            }
 
         # Print epoch summary
         ep_time = time.time() - epoch_start
@@ -225,7 +252,7 @@ def train_official_mode(
         eta = f"ETA {fmt_dur(remaining)}" if epoch + 1 < cfg.max_epochs else "done"
 
         print(
-            f"{epoch+1:>6}  {fmt_dur(ep_time):>7}  {fmt_dur(elapsed):>8}  "
+            f"{epoch + 1:>6}  {fmt_dur(ep_time):>7}  {fmt_dur(elapsed):>8}  "
             f"{avg_loss:>8.4f}  {train_acc:>7.4f}  {metrics['val_loss']:>8.4f}  {val_acc:>7.4f}  {metrics['balanced_acc']:>9.4f}  "
             f"{metrics['auroc']:>8.4f}  {metrics['f1_weighted']:>7.4f}  "
             f"{lr:>10.2e}  ({eta})"
@@ -233,16 +260,19 @@ def train_official_mode(
 
         # W&B per-epoch logging
         if wandb.run is not None:
-            wandb.log({
-                "train/loss":    avg_loss,
-                "train/acc":     train_acc,
-                "val/loss":      metrics["val_loss"],
-                "val/acc":       val_acc,
-                "val/bal_acc":   metrics["balanced_acc"],
-                "val/auroc":     metrics["auroc"],
-                "val/f1":        metrics["f1_weighted"],
-                "train/lr":      lr,
-            }, step=epoch + 1)
+            wandb.log(
+                {
+                    "train/loss": avg_loss,
+                    "train/acc": train_acc,
+                    "val/loss": metrics["val_loss"],
+                    "val/acc": val_acc,
+                    "val/bal_acc": metrics["balanced_acc"],
+                    "val/auroc": metrics["auroc"],
+                    "val/f1": metrics["f1_weighted"],
+                    "train/lr": lr,
+                },
+                step=epoch + 1,
+            )
 
         # Early stopping
         if patience_monitor(val_acc):
@@ -258,17 +288,18 @@ def train_official_mode(
     print(f"{'─' * COL_W}")
 
     return {
-        "val_acc":     best_metrics.get("accuracy"),
+        "val_acc": best_metrics.get("accuracy"),
         "val_bal_acc": best_metrics.get("balanced_acc"),
-        "val_auroc":   best_metrics.get("auroc"),
-        "val_f1":      best_metrics.get("f1_weighted"),
-        "best_epoch":  best_metrics.get("epoch"),
+        "val_auroc": best_metrics.get("auroc"),
+        "val_f1": best_metrics.get("f1_weighted"),
+        "best_epoch": best_metrics.get("epoch"),
         "epochs_trained": epoch + 1,
-        "best_state":  best_state,
+        "best_state": best_state,
     }
 
 
 # ── Per-fold runner ──────────────────────────────────────────────────────────
+
 
 def run_fold_official(
     cfg: LPConfig,
@@ -290,27 +321,30 @@ def run_fold_official(
         f"  Fold {fold_idx}/{N_FOLDS}  |  {cfg.dataset}  |  task={cfg.task_mode}  |  "
         f"pooling={cfg.pooling}  |  device={DEVICE}{gen_tag}"
     )
-    print(
-        f"  train: {len(train_subject_ids)} subjects  |  val: {len(val_subject_ids)} subjects"
-    )
+    print(f"  train: {len(train_subject_ids)} subjects  |  val: {len(val_subject_ids)} subjects")
     print(f"{'#' * COL_W}")
 
     # Build raw datasets
     t_load = time.time()
     print("Building datasets ...", end="  ", flush=True)
     train_ds = build_raw_dataset(cfg, train_subject_ids, stimulus_filter=train_stimuli)
-    val_ds   = build_raw_dataset(cfg, val_subject_ids, stimulus_filter=val_stimuli)
+    val_ds = build_raw_dataset(cfg, val_subject_ids, stimulus_filter=val_stimuli)
     print(
-        f"done in {fmt_dur(time.time() - t_load)}  "
-        f"(train={len(train_ds):,}  val={len(val_ds):,})"
+        f"done in {fmt_dur(time.time() - t_load)}  (train={len(train_ds):,}  val={len(val_ds):,})"
     )
 
     train_loader = DataLoader(
-        train_ds, batch_size=cfg.batch_size, shuffle=True, num_workers=NUM_WORKERS,
+        train_ds,
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=NUM_WORKERS,
         pin_memory=True,
     )
     val_loader = DataLoader(
-        val_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=NUM_WORKERS,
+        val_ds,
+        batch_size=cfg.batch_size,
+        shuffle=False,
+        num_workers=NUM_WORKERS,
         pin_memory=True,
     )
 
@@ -337,7 +371,8 @@ def run_fold_official(
     run_name = cfg.run_name(fold_idx, gen_seed)
     if USE_WANDB:
         hparams = cfg.hparams_dict(
-            fold_idx=fold_idx, n_folds=N_FOLDS,
+            fold_idx=fold_idx,
+            n_folds=N_FOLDS,
             n_train_subjects=len(train_subject_ids),
             n_val_subjects=len(val_subject_ids),
             n_train_windows=len(train_ds),
@@ -346,9 +381,12 @@ def run_fold_official(
             gen_seed=gen_seed,
         )
         wandb.init(
-            project=WANDB_PROJECT, entity=WANDB_ENTITY,
-            name=run_name, group=cfg.group_name(),
-            config=hparams, reinit=True,
+            project=WANDB_PROJECT,
+            entity=WANDB_ENTITY,
+            name=run_name,
+            group=cfg.group_name(),
+            config=hparams,
+            reinit=True,
         )
 
     # Train
@@ -363,12 +401,14 @@ def run_fold_official(
         print(f"Classifier weights saved → {weights_path}")
 
     if USE_WANDB:
-        wandb.log({
-            "best/val_acc":     result.get("val_acc"),
-            "best/val_bal_acc": result.get("val_bal_acc"),
-            "best/val_auroc":   result.get("val_auroc"),
-            "best/val_f1":      result.get("val_f1"),
-        })
+        wandb.log(
+            {
+                "best/val_acc": result.get("val_acc"),
+                "best/val_bal_acc": result.get("val_bal_acc"),
+                "best/val_auroc": result.get("val_auroc"),
+                "best/val_f1": result.get("val_f1"),
+            }
+        )
         wandb.finish()
 
     # Cleanup
@@ -383,6 +423,7 @@ def run_fold_official(
 
 
 # ── Fast-mode helpers (pre-computed embeddings) ──────────────────────────────
+
 
 class WarmupCallback(Callback):
     """Linear LR warmup over the first N epochs (fast mode)."""
@@ -402,7 +443,8 @@ class WarmupCallback(Callback):
 
 def subject_cache_path(cfg: LPConfig, subject_id: int) -> Path:
     return (
-        cfg.embeddings_dir / cfg.task_mode
+        cfg.embeddings_dir
+        / cfg.task_mode
         / f"ws{cfg.window_size}_st{cfg.stride}_{cfg.pool_tag}"
         / f"sub_{subject_id:02d}.pt"
     )
@@ -431,8 +473,10 @@ def precompute_all_subjects(
 
         dataset = build_raw_dataset(
             LPConfig(
-                dataset=cfg.dataset, task_mode=cfg.task_mode,
-                window_size=cfg.window_size, stride=cfg.stride,
+                dataset=cfg.dataset,
+                task_mode=cfg.task_mode,
+                window_size=cfg.window_size,
+                stride=cfg.stride,
                 scale_factor=cfg.scale_factor,
             ),
             [sid],
@@ -440,11 +484,15 @@ def precompute_all_subjects(
         print(f"({len(dataset)} windows)", end="  ", flush=True)
 
         embeddings, labels, stim_indices = extractor.extract_embeddings(
-            dataset, batch_size=cfg.batch_size,
-            use_pooling=cfg.use_pooling, no_pool_mode=cfg.no_pool_mode,
+            dataset,
+            batch_size=cfg.batch_size,
+            use_pooling=cfg.use_pooling,
+            no_pool_mode=cfg.no_pool_mode,
         )
         EmbeddingExtractor.save_embeddings(
-            embeddings, labels, subject_cache_path(cfg, sid),
+            embeddings,
+            labels,
+            subject_cache_path(cfg, sid),
             stimulus_indices=stim_indices,
         )
         print(f"done in {fmt_dur(time.time() - t_sub)}")
@@ -466,7 +514,9 @@ def load_subjects_embeddings(
         embs, labels = payload["embeddings"], payload["labels"]
         if stimulus_filter is not None:
             stim_idx = payload["stimulus_indices"]
-            mask = torch.tensor([int(s.item()) in stimulus_filter for s in stim_idx], dtype=torch.bool)
+            mask = torch.tensor(
+                [int(s.item()) in stimulus_filter for s in stim_idx], dtype=torch.bool
+            )
             embs, labels = embs[mask], labels[mask]
         all_embs.append(embs)
         all_labels.append(labels)
@@ -483,7 +533,8 @@ def run_fold_fast(
     gen_seed: int | None = None,
 ) -> dict:
     """Run one fold in fast mode (pre-computed embeddings + Lightning)."""
-    from src.utils.callbacks import EpochSummaryCallback, fmt_dur as _fmt_dur
+    from src.utils.callbacks import EpochSummaryCallback
+    from src.utils.callbacks import fmt_dur as _fmt_dur
 
     seed_label = f"  |  gen_seed={gen_seed}" if gen_seed is not None else ""
     gen_tag = f"  |  GENERALIZATION{seed_label}" if cfg.generalization else ""
@@ -497,17 +548,34 @@ def run_fold_fast(
 
     t_load = time.time()
     print("Loading embeddings ...", end="  ", flush=True)
-    train_embs, train_lbls = load_subjects_embeddings(cfg, train_subject_ids, stimulus_filter=train_stimuli)
-    val_embs, val_lbls     = load_subjects_embeddings(cfg, val_subject_ids, stimulus_filter=val_stimuli)
-    print(f"done in {_fmt_dur(time.time() - t_load)}  (train={train_embs.shape[0]:,}  val={val_embs.shape[0]:,})")
+    train_embs, train_lbls = load_subjects_embeddings(
+        cfg, train_subject_ids, stimulus_filter=train_stimuli
+    )
+    val_embs, val_lbls = load_subjects_embeddings(cfg, val_subject_ids, stimulus_filter=val_stimuli)
+    print(
+        f"done in {_fmt_dur(time.time() - t_load)}  (train={train_embs.shape[0]:,}  val={val_embs.shape[0]:,})"
+    )
 
-    train_loader = DataLoader(TensorDataset(train_embs, train_lbls), batch_size=cfg.batch_size, shuffle=True, num_workers=NUM_WORKERS)
-    val_loader   = DataLoader(TensorDataset(val_embs, val_lbls), batch_size=cfg.batch_size, shuffle=False, num_workers=NUM_WORKERS)
+    train_loader = DataLoader(
+        TensorDataset(train_embs, train_lbls),
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=NUM_WORKERS,
+    )
+    val_loader = DataLoader(
+        TensorDataset(val_embs, val_lbls),
+        batch_size=cfg.batch_size,
+        shuffle=False,
+        num_workers=NUM_WORKERS,
+    )
 
     embed_dim = train_embs.shape[1]
     model = LinearProber(
-        num_classes=cfg.num_classes, embed_dim=embed_dim, lr=cfg.lr,
-        dropout=cfg.dropout, warmup_epochs=cfg.warmup_epochs,
+        num_classes=cfg.num_classes,
+        embed_dim=embed_dim,
+        lr=cfg.lr,
+        dropout=cfg.dropout,
+        warmup_epochs=cfg.warmup_epochs,
         scheduler_patience=cfg.scheduler_patience,
         normalize_features=cfg.normalize_features,
     )
@@ -517,36 +585,59 @@ def run_fold_fast(
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     hparams = cfg.hparams_dict(
-        fold_idx=fold_idx, n_folds=N_FOLDS,
+        fold_idx=fold_idx,
+        n_folds=N_FOLDS,
         n_train_subjects=len(train_subject_ids),
         n_val_subjects=len(val_subject_ids),
         n_train_windows=int(train_embs.shape[0]),
         n_val_windows=int(val_embs.shape[0]),
-        embed_dim=embed_dim, gen_seed=gen_seed,
+        embed_dim=embed_dim,
+        gen_seed=gen_seed,
     )
 
     if USE_WANDB:
-        logger = WandbLogger(project=WANDB_PROJECT, entity=WANDB_ENTITY,
-                             name=run_name, group=cfg.group_name(),
-                             config=hparams, log_model=False, reinit=True)
+        logger = WandbLogger(
+            project=WANDB_PROJECT,
+            entity=WANDB_ENTITY,
+            name=run_name,
+            group=cfg.group_name(),
+            config=hparams,
+            log_model=False,
+            reinit=True,
+        )
     else:
         logger = CSVLogger(save_dir=str(ckpt_dir), name="csv_logs")
 
     checkpoint_cb = ModelCheckpoint(
-        dirpath=str(ckpt_dir), filename="best-{epoch:02d}-{val/acc:.4f}",
-        monitor="val/acc", mode="max", save_top_k=1, verbose=False,
+        dirpath=str(ckpt_dir),
+        filename="best-{epoch:02d}-{val/acc:.4f}",
+        monitor="val/acc",
+        mode="max",
+        save_top_k=1,
+        verbose=False,
     )
-    early_stop_cb = EarlyStopping(monitor="val/acc", patience=cfg.early_stop_patience, mode="max", verbose=False)
+    early_stop_cb = EarlyStopping(
+        monitor="val/acc", patience=cfg.early_stop_patience, mode="max", verbose=False
+    )
     summary_cb = EpochSummaryCallback(
-        output_dir=ckpt_dir, fold_idx=fold_idx, task_mode=cfg.task_mode,
-        train_subjects=train_subject_ids, val_subjects=val_subject_ids, hparams=hparams,
+        output_dir=ckpt_dir,
+        fold_idx=fold_idx,
+        task_mode=cfg.task_mode,
+        train_subjects=train_subject_ids,
+        val_subjects=val_subject_ids,
+        hparams=hparams,
     )
     warmup_cb = WarmupCallback(warmup_epochs=cfg.warmup_epochs, base_lr=cfg.lr)
 
     trainer = L.Trainer(
-        max_epochs=cfg.max_epochs, accelerator=ACCELERATOR, devices=1,
-        logger=logger, callbacks=[checkpoint_cb, early_stop_cb, summary_cb, warmup_cb],
-        log_every_n_steps=1, enable_progress_bar=False, enable_model_summary=True,
+        max_epochs=cfg.max_epochs,
+        accelerator=ACCELERATOR,
+        devices=1,
+        logger=logger,
+        callbacks=[checkpoint_cb, early_stop_cb, summary_cb, warmup_cb],
+        log_every_n_steps=1,
+        enable_progress_bar=False,
+        enable_model_summary=True,
     )
 
     try:
@@ -569,43 +660,77 @@ def run_fold_fast(
     valid_rows = [r for r in summary_cb.epoch_history if r["val_acc"] is not None]
     best_row = max(valid_rows, key=lambda r: r["val_acc"]) if valid_rows else {}
     return {
-        "fold":           fold_idx,
-        "val_acc":        best_row.get("val_acc"),
-        "val_auroc":      best_row.get("val_auroc"),
-        "val_f1":         best_row.get("val_f1"),
-        "best_epoch":     best_row.get("epoch"),
+        "fold": fold_idx,
+        "val_acc": best_row.get("val_acc"),
+        "val_auroc": best_row.get("val_auroc"),
+        "val_f1": best_row.get("val_f1"),
+        "best_epoch": best_row.get("epoch"),
         "epochs_trained": len(summary_cb.epoch_history),
     }
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+
 def parse_args() -> LPConfig:
     parser = argparse.ArgumentParser(description="Linear Probing with REVE")
 
-    parser.add_argument("--dataset", choices=["faced", "thu-ep"], default="faced",
-                        help="Dataset (default: faced)")
-    parser.add_argument("--task", choices=["binary", "9-class"], default="binary",
-                        help="Classification task (default: binary)")
-    parser.add_argument("--fold", type=int, default=None, metavar="N",
-                        help="Run only this fold (1-10). Omit for all folds.")
+    parser.add_argument(
+        "--dataset", choices=["faced", "thu-ep"], default="faced", help="Dataset (default: faced)"
+    )
+    parser.add_argument(
+        "--task",
+        choices=["binary", "9-class"],
+        default="binary",
+        help="Classification task (default: binary)",
+    )
+    parser.add_argument(
+        "--fold",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Run only this fold (1-10). Omit for all folds.",
+    )
 
     # Mode
     mode_group = parser.add_mutually_exclusive_group()
-    mode_group.add_argument("--official", dest="official_mode", action="store_true", default=True,
-                            help="Official mode: frozen encoder + trainable query token (default)")
-    mode_group.add_argument("--fast", dest="official_mode", action="store_false",
-                            help="Fast mode: pre-computed embeddings")
+    mode_group.add_argument(
+        "--official",
+        dest="official_mode",
+        action="store_true",
+        default=True,
+        help="Official mode: frozen encoder + trainable query token (default)",
+    )
+    mode_group.add_argument(
+        "--fast",
+        dest="official_mode",
+        action="store_false",
+        help="Fast mode: pre-computed embeddings",
+    )
 
     # Pooling
-    parser.add_argument("--pooling", choices=["no", "last", "last_avg"], default="no",
-                        help="Pooling mode for official mode (default: no)")
+    parser.add_argument(
+        "--pooling",
+        choices=["no", "last", "last_avg"],
+        default="no",
+        help="Pooling mode for official mode (default: no)",
+    )
 
     # Window
-    parser.add_argument("--window", type=float, default=10.0, metavar="S",
-                        help="Window length in seconds (default: 10)")
-    parser.add_argument("--stride", type=float, default=10.0, metavar="S",
-                        help="Stride in seconds (default: 10, non-overlapping)")
+    parser.add_argument(
+        "--window",
+        type=float,
+        default=10.0,
+        metavar="S",
+        help="Window length in seconds (default: 10)",
+    )
+    parser.add_argument(
+        "--stride",
+        type=float,
+        default=10.0,
+        metavar="S",
+        help="Stride in seconds (default: 10, non-overlapping)",
+    )
 
     # Training
     parser.add_argument("--epochs", type=int, default=50, help="Max epochs (default: 50)")
@@ -613,24 +738,56 @@ def parse_args() -> LPConfig:
     parser.add_argument("--batch-size", type=int, default=64, help="Batch size (default: 64)")
 
     # Regularization toggles
-    parser.add_argument("--no-mixup", dest="use_mixup", action="store_false", default=True,
-                        help="Disable mixup augmentation")
-    parser.add_argument("--no-amp", dest="use_amp", action="store_false", default=True,
-                        help="Disable mixed precision")
+    parser.add_argument(
+        "--no-mixup",
+        dest="use_mixup",
+        action="store_false",
+        default=True,
+        help="Disable mixup augmentation",
+    )
+    parser.add_argument(
+        "--no-amp",
+        dest="use_amp",
+        action="store_false",
+        default=True,
+        help="Disable mixed precision",
+    )
 
     # Fast-mode options
-    parser.add_argument("--normalize", action="store_true", default=False,
-                        help="L2 normalize features before classifier (fast mode)")
-    parser.add_argument("--no-pooling", dest="use_pooling_fast", action="store_false", default=True,
-                        help="Bypass attention pooling in fast mode")
-    parser.add_argument("--no-pool-mode", choices=["mean", "flat"], default="mean",
-                        help="Flatten mode when --no-pooling (fast mode)")
+    parser.add_argument(
+        "--normalize",
+        action="store_true",
+        default=False,
+        help="L2 normalize features before classifier (fast mode)",
+    )
+    parser.add_argument(
+        "--no-pooling",
+        dest="use_pooling_fast",
+        action="store_false",
+        default=True,
+        help="Bypass attention pooling in fast mode",
+    )
+    parser.add_argument(
+        "--no-pool-mode",
+        choices=["mean", "flat"],
+        default="mean",
+        help="Flatten mode when --no-pooling (fast mode)",
+    )
 
     # Generalization
-    parser.add_argument("--generalization", action="store_true", default=False,
-                        help="Stimulus-generalization evaluation")
-    parser.add_argument("--gen-seeds", type=int, nargs="+", default=[123],
-                        help="Seeds for stimulus splits (default: [123])")
+    parser.add_argument(
+        "--generalization",
+        action="store_true",
+        default=False,
+        help="Stimulus-generalization evaluation",
+    )
+    parser.add_argument(
+        "--gen-seeds",
+        type=int,
+        nargs="+",
+        default=[123],
+        help="Seeds for stimulus splits (default: [123])",
+    )
 
     args = parser.parse_args()
 
@@ -657,8 +814,10 @@ def parse_args() -> LPConfig:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     import multiprocessing
+
     multiprocessing.set_start_method("fork", force=True)
 
     cfg = parse_args()
@@ -712,25 +871,36 @@ def main() -> None:
             gen_seed = seed
             train_stimuli, val_stimuli = get_stimulus_generalization_split(cfg.task_mode, seed=seed)
             print(f"\n{'=' * COL_W}")
-            print(f"  SEED {seed}  |  {len(train_stimuli)} train stimuli, {len(val_stimuli)} held-out")
+            print(
+                f"  SEED {seed}  |  {len(train_stimuli)} train stimuli, {len(val_stimuli)} held-out"
+            )
             print(f"{'=' * COL_W}")
 
         fold_results: list[dict] = []
         for fold_idx, (train_idx, val_idx) in folds_to_run:
             train_subjects = [all_subjects[i] for i in train_idx]
-            val_subjects   = [all_subjects[i] for i in val_idx]
+            val_subjects = [all_subjects[i] for i in val_idx]
 
             if cfg.official_mode:
                 result = run_fold_official(
-                    cfg, fold_idx, train_subjects, val_subjects,
-                    reve_model, pos_tensor,
-                    train_stimuli=train_stimuli, val_stimuli=val_stimuli,
+                    cfg,
+                    fold_idx,
+                    train_subjects,
+                    val_subjects,
+                    reve_model,
+                    pos_tensor,
+                    train_stimuli=train_stimuli,
+                    val_stimuli=val_stimuli,
                     gen_seed=gen_seed,
                 )
             else:
                 result = run_fold_fast(
-                    cfg, fold_idx, train_subjects, val_subjects,
-                    train_stimuli=train_stimuli, val_stimuli=val_stimuli,
+                    cfg,
+                    fold_idx,
+                    train_subjects,
+                    val_subjects,
+                    train_stimuli=train_stimuli,
+                    val_stimuli=val_stimuli,
                     gen_seed=gen_seed,
                 )
             fold_results.append(result)
@@ -739,18 +909,20 @@ def main() -> None:
             print_fold_summary(cfg, fold_results, gen_seed=gen_seed)
 
         if gen_seed is not None:
-            accs     = [r["val_acc"]     for r in fold_results if r.get("val_acc")     is not None]
+            accs = [r["val_acc"] for r in fold_results if r.get("val_acc") is not None]
             bal_accs = [r["val_bal_acc"] for r in fold_results if r.get("val_bal_acc") is not None]
-            aurocs   = [r["val_auroc"]   for r in fold_results if r.get("val_auroc")   is not None]
-            f1s      = [r["val_f1"]      for r in fold_results if r.get("val_f1")      is not None]
-            seed_summaries.append({
-                "seed":         gen_seed,
-                "mean_acc":     round(statistics.mean(accs),     4) if accs     else None,
-                "mean_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
-                "mean_auroc":   round(statistics.mean(aurocs),   4) if aurocs   else None,
-                "mean_f1":      round(statistics.mean(f1s),      4) if f1s      else None,
-                "folds":        fold_results,
-            })
+            aurocs = [r["val_auroc"] for r in fold_results if r.get("val_auroc") is not None]
+            f1s = [r["val_f1"] for r in fold_results if r.get("val_f1") is not None]
+            seed_summaries.append(
+                {
+                    "seed": gen_seed,
+                    "mean_acc": round(statistics.mean(accs), 4) if accs else None,
+                    "mean_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
+                    "mean_auroc": round(statistics.mean(aurocs), 4) if aurocs else None,
+                    "mean_f1": round(statistics.mean(f1s), 4) if f1s else None,
+                    "folds": fold_results,
+                }
+            )
 
     # Cleanup
     del reve_model, pos_tensor
