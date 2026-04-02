@@ -14,7 +14,7 @@ on:
 
 jobs:
   # Fast tests (no model, no real data)
-  # Runs on every push. Finishes in ~60s. Catches preprocessing and dataset bugs.
+  # Runs on every push. Catches preprocessing and dataset bugs.
   test-fast:
     name: Fast tests (preprocessing + datasets + folds)
     runs-on: ubuntu-latest
