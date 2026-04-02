@@ -63,3 +63,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Test files import inside test methods deliberately (lazy imports for isolation)
 "tests/**" = ["F401", "E402"]
+# Train scripts use sys.path.insert() before imports (needed for cluster execution),
+# which splits the import block and makes isort unable to sort it as one unit.
+"src/approaches/*/train_*.py" = ["I001"]
+"src/approaches/*/training.py" = ["I001"]
