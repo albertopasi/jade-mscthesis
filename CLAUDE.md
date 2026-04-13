@@ -11,6 +11,13 @@ Future work will include (hence it is important to keep things modular and easil
 uv run python -m src.approaches.linear_probing.train_lp ...
 ```
 
+When making changes to existing code, prefer minimal diffs that preserve the original logic. Do not refactor or over-engineer unless explicitly asked.
+
+When adding results or data to documentation, default to summary/aggregate level (e.g., cross-seed averages) unless per-instance detail is explicitly requested.
+
+Do not extensively explore the codebase or run smoke tests unless asked. Start implementing directly based on the information available, and ask clarifying questions if needed.
+
+Before making any changes, create a todo list of exactly what you plan to do. Wait for my approval before starting. Keep each step small and specific.
 ---
 
 ## Project structure

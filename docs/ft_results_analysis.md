@@ -79,6 +79,7 @@ Tested as an alternative to concatenation pooling.
 
 | Dataset | Task | Pooling | val_acc | val_bal_acc | val_auroc | val_f1 |
 |---|---|---|---|---|---|---|
+| FACED | 9-class | last | 0.4364 ± 0.0231 | 0.4376 ± 0.0236 | 0.8061 ± 0.0234 | 0.4329 ± 0.0216 |
 | FACED | binary | last | 0.7364 ± 0.0230 | 0.7364 ± 0.0230 | 0.7992 ± 0.0321 | 0.7360 ± 0.0233 |
 | THU-EP | binary | last | 0.6363 ± 0.0170 | 0.6362 ± 0.0169 | 0.6740 ± 0.0232 | 0.6339 ± 0.0187 |
 | THU-EP | 9-class | last | 0.3805 ± 0.0404 | 0.3785 ± 0.0414 | 0.7760 ± 0.0357 | 0.3752 ± 0.0408 |
@@ -134,28 +135,19 @@ Evaluation protocol: train on 2/3 of stimuli per emotion × train subjects; vali
 | THU-EP | 9-class | 0.1714 ± 0.0030 | 0.1711 ± 0.0029 | ~0.564 | 0.1452 ± 0.0037 |
 | THU-EP | binary | 0.5649 ± 0.0083 | 0.5645 ± 0.0086 | ~0.560 | 0.5434 ± 0.0118 |
 
-### 5.4 Per-seed breakdown (LoRA, no-mixup)
+### 5.4 Cross-seed averages (no-mixup)
 
-**FACED binary:**
-| Seed | val_acc | val_auroc |
-|---|---|---|
-| 123 | 0.6022 | 0.6105 |
-| 456 | 0.6050 | 0.6236 |
-| 789 | 0.5846 | 0.6019 |
+All values are mean ± std over seeds {123, 456, 789}.
 
-**FACED 9-class:**
-| Seed | val_acc | val_auroc |
-|---|---|---|
-| 123 | 0.1601 | 0.5344 |
-| 456 | 0.1591 | 0.5407 |
-| 789 | 0.1616 | 0.5401 |
-
-**THU-EP 9-class (LoRA no-mixup, fullft):**
-| Seed | LoRA val_acc | LoRA auroc | FullFT val_acc | FullFT auroc |
+| Dataset | Task | Method | val_acc | val_auroc |
 |---|---|---|---|---|
-| 123 | 0.1831 | 0.5594 | 0.1741 | 0.5604 |
-| 456 | 0.1806 | 0.5704 | 0.1719 | 0.5578 |
-| 789 | 0.1733 | 0.5620 | 0.1681 | 0.5530 |
+| FACED | binary | LoRA | 0.5970 ± 0.0171 | ~0.607 |
+| FACED | binary | Full FT | 0.5973 ± 0.0111 | ~0.614 |
+| FACED | 9-class | LoRA | 0.1603 ± 0.0013 | ~0.534 |
+| FACED | 9-class | Full FT | 0.1552 ± 0.0078 | ~0.534 |
+| THU-EP | 9-class | LoRA | 0.1790 ± 0.0051 | ~0.564 |
+| THU-EP | 9-class | Full FT | 0.1714 ± 0.0030 | ~0.564 |
+| THU-EP | binary | Full FT | 0.5649 ± 0.0083 | ~0.560 |
 
 ---
 
@@ -260,11 +252,14 @@ Comparison (LoRA, no-mixup):
 
 | Dataset | Task | Pooling `no` val_acc | Pooling `last` val_acc | Δ |
 |---|---|---|---|---|
+| FACED | 9-class | 0.5362 | 0.4364 | **−0.0998** (no better) |
 | FACED | binary | 0.7250 | 0.7364 | **+0.0114** (last) |
 | THU-EP | binary | 0.6827 | 0.6363 | **−0.0464** (no better) |
 | THU-EP | 9-class | 0.4668 | 0.3805 | **−0.0863** (no better) |
 
-Results are mixed. `last` pooling achieves marginally higher accuracy for FACED binary (+1.1 pp), but degrades substantially for THU-EP 9-class (−8.6 pp) and binary (−4.6 pp). The query token provides a compressed summary that may suffice for the balanced FACED binary task, but is insufficient for the fine-grained spatial information needed for 9-class or THU-EP classification.
+Results are mixed. `last` pooling achieves marginally higher accuracy for FACED binary (+1.1 pp), but degrades substantially for FACED 9-class (−10.0 pp), THU-EP 9-class (−8.6 pp), and THU-EP binary (−4.6 pp). The query token provides a compressed summary that may suffice for the balanced FACED binary task, but is insufficient for the fine-grained spatial information needed for 9-class classification or for the noisier THU-EP dataset.
+
+The `last` pooling result for FACED binary is the only case where it is competitive — the +1.1 pp advantage is within fold-to-fold noise (std ~0.023) and the AUROC is also slightly higher (0.7992 vs 0.7843). This suggests the query token provides a reasonably compact summary for the simple binary valence task, but the spatial patch information becomes critical for harder multi-class discrimination and for the noisier THU-EP signals.
 
 The `no` pooling variant is more robust across datasets and tasks and remains the default for all further experiments.
 
@@ -485,7 +480,7 @@ The static split results confirm that no-mixup is consistently better for both v
 
 3. **Mixup hurts fine-tuning uniformly.** No-mixup outperforms mixup by 1–3 pp across all methods, datasets, and tasks. This is contrary to its typical role as a beneficial regulariser, and likely reflects a mismatch between synthetic blended inputs and the distribution of embeddings produced by a partially frozen pretrained encoder.
 
-4. **Pooling `no` (full concatenation) is generally better than `last` (query token only).** The exception is FACED binary (+1.1 pp for `last`), but for THU-EP and 9-class tasks, `no` pooling is substantially better.
+4. **Pooling `no` (full concatenation) is generally better than `last` (query token only).** `last` marginally outperforms `no` only for FACED binary (+1.1 pp, within noise), but degrades substantially for FACED 9-class (−10.0 pp), THU-EP 9-class (−8.6 pp), and THU-EP binary (−4.6 pp). Patch-level spatial information is critical for multi-class and noisier dataset settings.
 
 5. **THU-EP is harder and noisier than FACED** across all conditions. The LoRA–full FT gap is smaller for THU-EP, indicating diminishing returns from additional capacity with fewer training subjects.
 
