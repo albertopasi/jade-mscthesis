@@ -178,12 +178,7 @@ def train_stage_jade(
             n_batches += 1
 
             with torch.no_grad():
-                if use_supcon:
-                    preds = logits.argmax(dim=1)
-                elif use_mixup:
-                    preds = output.argmax(dim=1)
-                else:
-                    preds = output.argmax(dim=1)
+                preds = (logits if use_supcon else output).argmax(dim=1)
             n_correct += (preds == target).sum().item()
             n_samples += target.size(0)
 

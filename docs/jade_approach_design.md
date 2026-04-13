@@ -89,7 +89,7 @@ Linear(input_dim, 512) -> ReLU -> Linear(512, 128) -> L2-normalize
 
 The classifier uses the full `(1 + C*H) * E` flattened vector (180,736-d) because the linear head can learn per-patch, per-channel weights, which experiments show yields the best classification accuracy.
 
-However, using this full vector as input to the projection head would require a first linear layer of `Linear(180736, 512)` = **92.5M parameters** — more than the entire REVE encoder (~85M params). This would:
+However, using this full vector as input to the projection head would require a first linear layer of `Linear(180736, 512)` = **92.5M parameters** — more than the entire REVE encoder (~69M params). This would:
 - Dominate training and overfit easily
 - Slow down computation significantly
 - Defeat the purpose of LoRA (parameter-efficient fine-tuning)
@@ -98,7 +98,7 @@ Instead, the projection head taps off the **context vector** (512-d), which is t
 
 - **No information loss for classification**: The classifier still sees the full 180k-d vector, unchanged from FT.
 - **Effective contrastive learning**: The SupCon loss shapes the encoder's representations through backpropagation. Gradients flow from the projection head through the context vector, through the query-attention mechanism, and into the encoder. This indirectly improves the quality of *all* patch embeddings — including the ones the classifier uses.
-- **Parameter efficiency**: The projection head adds only ~330K parameters (512*512 + 512*128 + biases), negligible relative to the encoder.
+- **Parameter efficiency**: The projection head adds only ~330K parameters (512 * 512 + 512 * 128 + biases), negligible relative to the encoder.
 
 The `--supcon-repr` CLI argument allows selecting the input to the projection head:
 - `context` (default, 512-d): Query-attention output. Most semantically compressed.

@@ -71,6 +71,10 @@ class SupConLoss(nn.Module):
         valid = n_positives > 0  # exclude singleton-class anchors
 
         mean_log_prob = (pos_mask.float() * log_prob).sum(dim=1) / n_positives.clamp(min=1)
-        loss = -(mean_log_prob[valid]).mean()
 
+        # If no anchor has a positive pair (all singletons), return zero loss.
+        if not valid.any():
+            return torch.tensor(0.0, device=device, requires_grad=True)
+
+        loss = -(mean_log_prob[valid]).mean()
         return loss

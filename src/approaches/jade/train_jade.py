@@ -58,17 +58,17 @@ import torch
 from torch.utils.data import DataLoader
 
 import wandb
+# Reuse LoRA utilities from FT — apply_lora is duck-typed on cfg.lora_*
+# attributes, which JADEConfig provides identically.
 from src.approaches.fine_tuning.lora import apply_lora, print_lora_summary
 from src.approaches.jade.config import (
-    DEVICE,
-    NUM_WORKERS,
     OUTPUT_DIR,
-    SAMPLING_RATE,
     USE_WANDB,
     WANDB_ENTITY,
     WANDB_PROJECT,
     JADEConfig,
 )
+from src.approaches.shared.config import DEVICE, NUM_WORKERS, SAMPLING_RATE
 from src.approaches.jade.model import ReveClassifierJADE
 from src.approaches.jade.summary import print_cross_seed_summary, print_fold_summary
 from src.approaches.jade.training import train_stage_jade
