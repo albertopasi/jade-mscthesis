@@ -19,7 +19,12 @@ import wandb
 from src.approaches.jade.loss import SupConLoss
 from src.approaches.shared.metrics import evaluate_model
 from src.approaches.shared.stable_adamw import StableAdamW
-from src.approaches.shared.training_utils import COL_W, _PatienceMonitor, _get_exponential_warmup_lambda, fmt_dur
+from src.approaches.shared.training_utils import (
+    COL_W,
+    _PatienceMonitor,
+    _get_exponential_warmup_lambda,
+    fmt_dur,
+)
 
 
 def train_stage_jade(

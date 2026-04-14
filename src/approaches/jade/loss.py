@@ -52,7 +52,7 @@ class SupConLoss(nn.Module):
 
         # Masks
         labels_eq = labels.unsqueeze(0) == labels.unsqueeze(1)  # (B, B)
-        self_mask = ~torch.eye(B, dtype=torch.bool, device=device) # A(i) (all except self)
+        self_mask = ~torch.eye(B, dtype=torch.bool, device=device)  # A(i) (all except self)
         pos_mask = labels_eq & self_mask  # P(i) (same class, not self)
 
         # Log-sum-exp trick for numerical stability

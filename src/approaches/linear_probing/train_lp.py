@@ -73,7 +73,12 @@ from src.approaches.linear_probing.summary import (
 from src.approaches.shared.dataset import build_raw_dataset
 from src.approaches.shared.reve import get_channel_names, load_reve_and_positions
 from src.approaches.shared.stable_adamw import StableAdamW
-from src.approaches.shared.training_utils import COL_W, _PatienceMonitor, _get_exponential_warmup_lambda, fmt_dur
+from src.approaches.shared.training_utils import (
+    COL_W,
+    _PatienceMonitor,
+    _get_exponential_warmup_lambda,
+    fmt_dur,
+)
 from src.datasets.folds import (
     N_FOLDS,
     get_all_subjects,
