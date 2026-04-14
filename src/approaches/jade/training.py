@@ -19,25 +19,7 @@ import wandb
 from src.approaches.jade.loss import SupConLoss
 from src.approaches.shared.metrics import evaluate_model
 from src.approaches.shared.stable_adamw import StableAdamW
-from src.approaches.shared.training_utils import COL_W, _get_exponential_warmup_lambda, fmt_dur
-
-
-class _PatienceMonitor:
-    """Early stopping monitor: stops when counter >= patience."""
-
-    def __init__(self, patience: int = 10):
-        self.patience = patience
-        self.best_val = 0.0
-        self.counter = 0
-
-    def __call__(self, val: float) -> bool:
-        if val > self.best_val:
-            self.best_val = val
-            self.counter = 0
-            return False
-        else:
-            self.counter += 1
-            return self.counter >= self.patience
+from src.approaches.shared.training_utils import COL_W, _PatienceMonitor, _get_exponential_warmup_lambda, fmt_dur
 
 
 def train_stage_jade(
@@ -59,7 +41,7 @@ def train_stage_jade(
     device: str,
     wandb_epoch_offset: int = 0,
     save_trainable_only: bool = False,
-    # ── SupCon-specific ───────────────────────────────────────────
+    # SupCon-specific
     use_supcon: bool = False,
     supcon_alpha: float = 0.5,
     supcon_temperature: float = 0.07,
@@ -130,7 +112,7 @@ def train_stage_jade(
         epoch_start = time.time()
         warmup_active = epoch <= warmup_epochs
 
-        # ── Train ──────────────────────────────────────────────────────
+        # Train
         model.train()
         epoch_loss = 0.0
         epoch_loss_ce = 0.0
@@ -185,7 +167,7 @@ def train_stage_jade(
         avg_loss = epoch_loss / max(n_batches, 1)
         train_acc = n_correct / max(n_samples, 1)
 
-        # ── Validate ───────────────────────────────────────────────────
+        # Validate
         metrics = evaluate_model(
             model,
             val_loader,

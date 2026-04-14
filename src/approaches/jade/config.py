@@ -21,11 +21,11 @@ from src.approaches.shared.config import (
     SAMPLING_RATE,
 )
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# Paths
 
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "jade_checkpoints"
 
-# ── W&B ───────────────────────────────────────────────────────────────────────
+# W&B
 
 USE_WANDB = True
 WANDB_PROJECT = "eeg-jade-v2"
@@ -34,7 +34,7 @@ WANDB_ENTITY = "zl-tudelft-thesis"
 
 @dataclass
 class JADEConfig:
-    """Mutable run configuration for JADE (Joint Alignment and Discriminative Embedding)."""
+    """Mutable run configuration for JADE."""
 
     # Dataset
     dataset: str = "faced"
@@ -57,7 +57,7 @@ class JADEConfig:
     use_amp: bool = True
     weight_decay: float = 0.01
 
-    # ── LP warmup stage (CE only, no SupCon) ──────────────────────────
+    # LP warmup stage (CE only, no SupCon)
     lp_max_epochs: int = 20
     lp_lr: float = 5e-3
     lp_dropout: float = 0.05
@@ -66,7 +66,7 @@ class JADEConfig:
     lp_early_stop_patience: int = 10
     lp_grad_clip: float = 2.0
 
-    # ── FT stage (joint CE + SupCon) ──────────────────────────────────
+    # FT stage (joint CE + SupCon)
     ft_max_epochs: int = 200
     ft_lr: float = 1e-4
     ft_dropout: float = 0.1
@@ -75,24 +75,24 @@ class JADEConfig:
     ft_early_stop_patience: int = 20
     ft_grad_clip: float = 2.0
 
-    # ── LoRA ──────────────────────────────────────────────────────────
+    # LoRA 
     lora_rank: int = 16
     lora_alpha: int = 16  # match rank (official default)
     lora_dropout: float = 0.0  # official uses no LoRA dropout
     lora_target: str = "attention"  # "attention" only for now
 
-    # ── SupCon ────────────────────────────────────────────────────────
+    # SupCon
     supcon_alpha: float = 0.5  # L = alpha * CE + (1 - alpha) * SupCon
     supcon_temperature: float = 0.07  # tau in SupCon loss
     supcon_proj_dim: int = 128  # projection head output dim
     supcon_proj_hidden: int = 512  # projection head hidden dim
     supcon_repr: str = "context"  # "context", "mean", "both"
 
-    # ── Optional mode flags ───────────────────────────────────────────
+    # Optional mode flags
     full_ft: bool = False  # True → full fine-tuning (no LoRA)
     reve_split: bool = False  # True → fixed train/val/test (FACED only)
 
-    # ── Derived helpers ───────────────────────────────────────────────
+    #  Derived helpers
 
     @property
     def data_root(self) -> Path:

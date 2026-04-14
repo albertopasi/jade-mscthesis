@@ -10,9 +10,6 @@ from __future__ import annotations
 import torch.nn as nn
 from peft import LoraConfig, get_peft_model
 
-from src.approaches.fine_tuning.config import FTConfig
-
-
 def get_lora_config(
     encoder: nn.Module,
     rank: int,
@@ -51,12 +48,12 @@ def get_lora_config(
     )
 
 
-def apply_lora(model: nn.Module, cfg: FTConfig) -> nn.Module:
+def apply_lora(model: nn.Module, cfg) -> nn.Module:
     """Wrap the encoder with LoRA adapters.
 
     Args:
-        model: ReveClassifierFT instance. model.reve is the REVE encoder.
-        cfg: FTConfig with LoRA hyperparameters.
+        model: Classifier with a .reve encoder attribute (FT or JADE).
+        cfg: Config with lora_rank, lora_alpha, lora_dropout, lora_target attributes.
 
     Returns:
         The same model with model.reve replaced by a PeftModel.

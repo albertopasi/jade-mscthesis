@@ -1,5 +1,5 @@
 """
-model.py — REVE classifier for JADE (Joint Alignment and Discriminative Embedding).
+model.py — REVE classifier for JADE.
 
 Provides ReveClassifierJADE: same architecture as ReveClassifierFT but with an
 additional projection head for supervised contrastive learning.  The projection
@@ -81,7 +81,7 @@ class ReveClassifierJADE(nn.Module):
         self.n_channels = n_channels
         self.n_patches = n_patches
 
-        # ── Projection head for SupCon ────────────────────────────────
+        # Projection head for SupCon
         proj_input_dim = self.embed_dim if supcon_repr != "both" else self.embed_dim * 2
         self.projection_head = nn.Sequential(
             nn.Linear(proj_input_dim, proj_hidden),
@@ -89,7 +89,7 @@ class ReveClassifierJADE(nn.Module):
             nn.Linear(proj_hidden, proj_dim),
         )
 
-    # ── Forward ───────────────────────────────────────────────────────
+    # Forward
 
     def forward(
         self,
@@ -119,7 +119,7 @@ class ReveClassifierJADE(nn.Module):
         # Rearrange to (B, C*H, E)
         x = rearrange(out_4d, "b c h e -> b (c h) e")
 
-        # ── Pooling & classification ──────────────────────────────────
+        # Pooling & classification
 
         if self.pooling == "last_avg":
             pool_repr = x.mean(dim=1)  # (B, E)
@@ -150,7 +150,7 @@ class ReveClassifierJADE(nn.Module):
 
         return logits
 
-    # ── Projection representation selection ───────────────────────────
+    # Projection representation selection
 
     def _get_proj_input(
         self,
@@ -186,7 +186,7 @@ class ReveClassifierJADE(nn.Module):
         else:  # "both"
             return torch.cat([context, mean_repr], dim=-1)  # (B, 2*E)
 
-    # ── Freeze / unfreeze helpers ─────────────────────────────────────
+    # Freeze / unfreeze helpers
 
     def freeze_encoder(self) -> None:
         """LP mode: freeze all encoder params, keep cls_query_token + head trainable."""

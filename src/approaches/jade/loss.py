@@ -1,10 +1,11 @@
 """
-loss.py — Supervised Contrastive Loss (Khosla et al. 2020).
+loss.py — Supervised Contrastive Loss.
 
 Implements L_sup_out: for each anchor i, averages the log-ratio over all
 positive pairs P(i), with the denominator summing over all non-self pairs A(i).
 
 Reference: "Supervised Contrastive Learning", Khosla et al. 2020, Eq. 2.
+https://doi.org/10.48550/arXiv.2004.11362
 """
 
 from __future__ import annotations
@@ -49,13 +50,12 @@ class SupConLoss(nn.Module):
         # Pairwise cosine similarity (features already L2-normed)
         sim = features @ features.T / self.temperature  # (B, B)
 
-        # --- Masks ---
+        # Masks
         labels_eq = labels.unsqueeze(0) == labels.unsqueeze(1)  # (B, B)
-        self_mask = ~torch.eye(B, dtype=torch.bool, device=device)
-        pos_mask = labels_eq & self_mask  # same class, not self
-        # A(i) = self_mask (all except self)
+        self_mask = ~torch.eye(B, dtype=torch.bool, device=device) # A(i) (all except self)
+        pos_mask = labels_eq & self_mask  # P(i) (same class, not self)
 
-        # --- Log-sum-exp trick for numerical stability ---
+        # Log-sum-exp trick for numerical stability
         sim_max, _ = sim.max(dim=1, keepdim=True)
         logits = sim - sim_max.detach()  # (B, B)
 

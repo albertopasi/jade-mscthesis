@@ -64,8 +64,8 @@ from src.approaches.linear_probing.model import (
     EmbeddingExtractor,
     LinearProber,
     ReveClassifierLP,
-    evaluate_model,
 )
+from src.approaches.shared.metrics import evaluate_model
 from src.approaches.linear_probing.summary import (
     print_cross_seed_summary,
     print_fold_summary,
@@ -73,7 +73,7 @@ from src.approaches.linear_probing.summary import (
 from src.approaches.shared.dataset import build_raw_dataset
 from src.approaches.shared.reve import get_channel_names, load_reve_and_positions
 from src.approaches.shared.stable_adamw import StableAdamW
-from src.approaches.shared.training_utils import COL_W, _get_exponential_warmup_lambda, fmt_dur
+from src.approaches.shared.training_utils import COL_W, _PatienceMonitor, _get_exponential_warmup_lambda, fmt_dur
 from src.datasets.folds import (
     N_FOLDS,
     get_all_subjects,
@@ -90,28 +90,7 @@ def fmt_metric(val: float, decimals: int = 4) -> str:
     return f"{val:.{decimals}f}"
 
 
-# ── Patience monitor ─────────────────────────────────────
-
-
-class PatienceMonitor:
-    """Monitor validation accuracy with early stopping."""
-
-    def __init__(self, patience: int = 10):
-        self.patience = patience
-        self.best_acc = 0.0
-        self.counter = 0
-
-    def __call__(self, val_acc: float) -> bool:
-        if val_acc > self.best_acc:
-            self.best_acc = val_acc
-            self.counter = 0
-            return False
-        else:
-            self.counter += 1
-            return self.counter >= self.patience
-
-
-# ── Official-mode training loop ──────────────────────────────────────────────
+# Official-mode training loop
 
 
 def train_official_mode(
@@ -153,7 +132,7 @@ def train_official_mode(
     )
 
     scaler = torch.amp.GradScaler()
-    patience_monitor = PatienceMonitor(cfg.early_stop_patience)
+    patience_monitor = _PatienceMonitor(cfg.early_stop_patience)
 
     best_metrics = {}
     best_acc = 0.0
@@ -175,7 +154,7 @@ def train_official_mode(
         # Official uses epoch <= warmup_epochs (inclusive)
         warmup_active = epoch <= cfg.warmup_epochs
 
-        # ── Train ──────────────────────────────────────────────────────
+        # Train
         model.train()
         epoch_loss = 0.0
         n_batches = 0
@@ -221,7 +200,7 @@ def train_official_mode(
         avg_loss = epoch_loss / max(n_batches, 1)
         train_acc = n_correct / max(n_samples, 1)
 
-        # ── Validate ───────────────────────────────────────────────────
+        # Validate
         metrics = evaluate_model(
             model,
             val_loader,
@@ -298,7 +277,7 @@ def train_official_mode(
     }
 
 
-# ── Per-fold runner ──────────────────────────────────────────────────────────
+# Per-fold runner
 
 
 def run_fold_official(
@@ -422,7 +401,7 @@ def run_fold_official(
     return result
 
 
-# ── Fast-mode helpers (pre-computed embeddings) ──────────────────────────────
+# Fast-mode helpers (pre-computed embeddings)
 
 
 class WarmupCallback(Callback):
@@ -669,7 +648,7 @@ def run_fold_fast(
     }
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# CLI
 
 
 def parse_args() -> LPConfig:
@@ -812,7 +791,7 @@ def parse_args() -> LPConfig:
     )
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Main
 
 
 def main() -> None:

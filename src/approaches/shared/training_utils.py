@@ -9,6 +9,24 @@ from __future__ import annotations
 COL_W = 105
 
 
+class _PatienceMonitor:
+    """Early stopping monitor: stops when counter >= patience."""
+
+    def __init__(self, patience: int = 10):
+        self.patience = patience
+        self.best_val = 0.0
+        self.counter = 0
+
+    def __call__(self, val: float) -> bool:
+        if val > self.best_val:
+            self.best_val = val
+            self.counter = 0
+            return False
+        else:
+            self.counter += 1
+            return self.counter >= self.patience
+
+
 def fmt_dur(seconds: float) -> str:
     """Format a duration in seconds as a human-readable string."""
     h, rem = divmod(int(seconds), 3600)

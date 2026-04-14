@@ -18,25 +18,7 @@ from torch.utils.data import DataLoader
 import wandb
 from src.approaches.shared.metrics import evaluate_model
 from src.approaches.shared.stable_adamw import StableAdamW
-from src.approaches.shared.training_utils import COL_W, _get_exponential_warmup_lambda, fmt_dur
-
-
-class _PatienceMonitor:
-    """Early stopping monitor matching official REVE: stops when counter > patience."""
-
-    def __init__(self, patience: int = 10):
-        self.patience = patience
-        self.best_val = 0.0
-        self.counter = 0
-
-    def __call__(self, val: float) -> bool:
-        if val > self.best_val:
-            self.best_val = val
-            self.counter = 0
-            return False
-        else:
-            self.counter += 1
-            return self.counter >= self.patience
+from src.approaches.shared.training_utils import COL_W, _PatienceMonitor, _get_exponential_warmup_lambda, fmt_dur
 
 
 def train_stage(
