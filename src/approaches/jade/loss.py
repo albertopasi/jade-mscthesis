@@ -29,7 +29,7 @@ class SupConLoss(nn.Module):
           B'   = number of anchors with at least one positive
     """
 
-    def __init__(self, temperature: float = 0.07) -> None:
+    def __init__(self, temperature: float = 0.1) -> None:
         super().__init__()
         self.temperature = temperature
 

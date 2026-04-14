@@ -49,7 +49,7 @@ def train_stage_jade(
     # SupCon-specific
     use_supcon: bool = False,
     supcon_alpha: float = 0.5,
-    supcon_temperature: float = 0.07,
+    supcon_temperature: float = 0.1,
 ) -> dict:
     """
     Shared training loop for both LP warmup and FT stages.

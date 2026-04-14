@@ -113,7 +113,7 @@ lower-variance contrastive signal. The CE component is unaffected.
 | Flag | Default | Description |
 |---|---|---|
 | `--alpha` | 0.5 | CE weight: `L = α·CE + (1−α)·SupCon` |
-| `--temperature` | 0.07 | SupCon temperature τ |
+| `--temperature` | 0.1 | SupCon temperature τ (Khosla et al. 2020) |
 | `--proj-dim` | 128 | Projection head output dim |
 | `--proj-hidden` | 512 | Projection head hidden dim |
 | `--supcon-repr` | `context` | Projection input: `context` (query-attention, 512-d), `mean` (mean-pool, 512-d), `both` (concat, 1024-d) |

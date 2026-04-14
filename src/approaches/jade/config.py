@@ -83,7 +83,7 @@ class JADEConfig:
 
     # SupCon
     supcon_alpha: float = 0.5  # L = alpha * CE + (1 - alpha) * SupCon
-    supcon_temperature: float = 0.07  # tau in SupCon loss
+    supcon_temperature: float = 0.1  # tau in SupCon loss (Khosla et al. 2020 default)
     supcon_proj_dim: int = 128  # projection head output dim
     supcon_proj_hidden: int = 512  # projection head hidden dim
     supcon_repr: str = "context"  # "context", "mean", "both"
