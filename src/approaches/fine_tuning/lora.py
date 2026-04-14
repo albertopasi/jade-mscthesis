@@ -10,6 +10,7 @@ from __future__ import annotations
 import torch.nn as nn
 from peft import LoraConfig, get_peft_model
 
+
 def get_lora_config(
     encoder: nn.Module,
     rank: int,

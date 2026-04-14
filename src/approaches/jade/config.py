@@ -51,7 +51,7 @@ class JADEConfig:
     pooling: str = "no"  # "no", "last", "last_avg"
 
     # Shared training
-    batch_size: int = 64
+    batch_size: int = 128  # larger than FT (64) — denser SupCon positive pairs per anchor
     scale_factor: float = 1000.0
     use_mixup: bool = False  # disabled — incompatible with SupCon
     use_amp: bool = True
@@ -75,7 +75,7 @@ class JADEConfig:
     ft_early_stop_patience: int = 20
     ft_grad_clip: float = 2.0
 
-    # LoRA 
+    # LoRA
     lora_rank: int = 16
     lora_alpha: int = 16  # match rank (official default)
     lora_dropout: float = 0.0  # official uses no LoRA dropout

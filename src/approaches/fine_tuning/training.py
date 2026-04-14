@@ -95,7 +95,7 @@ def train_stage(
         epoch_start = time.time()
         warmup_active = epoch <= warmup_epochs
 
-        # ── Train ──────────────────────────────────────────────────────
+        # Train
         model.train()
         epoch_loss = 0.0
         n_batches = 0
@@ -139,7 +139,7 @@ def train_stage(
         avg_loss = epoch_loss / max(n_batches, 1)
         train_acc = n_correct / max(n_samples, 1)
 
-        # ── Validate ───────────────────────────────────────────────────
+        # Validate
         metrics = evaluate_model(
             model,
             val_loader,

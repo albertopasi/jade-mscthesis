@@ -84,7 +84,7 @@ from src.datasets.folds import (
     get_stimulus_generalization_split,
 )
 
-# ── Per-fold runner ───────────────────────────────────────────────────────────
+# Per-fold runner
 
 
 def run_fold_jade(
@@ -188,7 +188,7 @@ def run_fold_jade(
             reinit=True,
         )
 
-    # ── Stage 1: LP warmup (CE only, no SupCon) ──────────────────────
+    # Stage 1: LP warmup (CE only, no SupCon)
     model.freeze_encoder()
     model.freeze_projection_head()
     model.set_dropout(cfg.lp_dropout)
@@ -223,7 +223,7 @@ def run_fold_jade(
         model.load_state_dict(lp_result["best_state"], strict=False)
         model.to(DEVICE)
 
-    # ── Stage 2: FT with LoRA/full FT + joint CE + SupCon ────────────
+    # Stage 2: FT with LoRA/full FT + joint CE + SupCon
     model.unfreeze_encoder()
     model.unfreeze_projection_head()
     if cfg.full_ft:
@@ -259,7 +259,7 @@ def run_fold_jade(
         supcon_temperature=cfg.supcon_temperature,
     )
 
-    # ── Save checkpoint ──────────────────────────────────────────────
+    # Save checkpoint
     ckpt_dir = None
     if ft_result.get("best_state"):
         ckpt_dir = OUTPUT_DIR / run_name
@@ -322,7 +322,7 @@ def run_fold_jade(
             json.dump(meta, f, indent=2)
         print(f"Fold metadata saved → {ckpt_dir / 'fold_meta.json'}")
 
-    # ── Test evaluation (revesplit only) ──────────────────────────────
+    # Test evaluation (revesplit only)
     test_metrics = None
     if test_ds is not None:
         test_loader = DataLoader(
@@ -404,7 +404,7 @@ def run_fold_jade(
     return result
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+# CLI
 
 
 def parse_args() -> JADEConfig:
@@ -579,7 +579,7 @@ def parse_args() -> JADEConfig:
     )
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Main
 
 
 def main() -> None:
@@ -623,7 +623,7 @@ def main() -> None:
     # Load REVE model once
     reve_model, pos_tensor = load_reve_and_positions(channel_names, device=DEVICE)
 
-    # ── REVE split path (single run with test set) ────────────────────
+    # REVE split path (single run with test set)
     if cfg.reve_split:
         train_subjects, val_subjects, test_subjects = get_official_split(cfg.dataset)
         print(
@@ -687,7 +687,7 @@ def main() -> None:
         print("\nDone.")
         return
 
-    # ── Standard k-fold path ──────────────────────────────────────────
+    # Standard k-fold path
     folds = get_kfold_splits(all_subjects)
     folds_to_run = (
         [(cfg.fold, folds[cfg.fold - 1])]
