@@ -133,12 +133,16 @@ class JADEConfig:
     def _supcon_tag(self) -> str:
         return f"a{self.supcon_alpha}_t{self.supcon_temperature}_{self.supcon_repr}"
 
+    @property
+    def _optim_tag(self) -> str:
+        return f"b{self.batch_size}_lr{self.ft_lr:g}"
+
     def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
         gen = f"_gen_s{gen_seed}" if gen_seed is not None else ""
         return (
             f"jade_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}_{self._supcon_tag}"
+            f"r{self.lora_rank}_{self._supcon_tag}_{self._optim_tag}"
             f"{self.mixup_tag}{self._mode_tags}{gen}_fold_{fold_idx}"
         )
 
@@ -147,7 +151,7 @@ class JADEConfig:
         return (
             f"jade_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}_{self._supcon_tag}"
+            f"r{self.lora_rank}_{self._supcon_tag}_{self._optim_tag}"
             f"{self.mixup_tag}{self._mode_tags}{gen}"
         )
 

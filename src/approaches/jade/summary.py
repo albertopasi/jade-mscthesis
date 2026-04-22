@@ -19,7 +19,7 @@ def _fold_filename(cfg: JADEConfig, gen_seed: int | None) -> str:
     gen_tag = f"_gen_s{gen_seed}" if gen_seed is not None else ""
     return (
         f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_r{cfg.lora_rank}_{cfg._supcon_tag}"
+        f"{cfg.pool_tag}_r{cfg.lora_rank}_{cfg._supcon_tag}_{cfg._optim_tag}"
         f"{cfg.mixup_tag}{cfg._mode_tags}{gen_tag}"
     )
 
@@ -27,7 +27,7 @@ def _fold_filename(cfg: JADEConfig, gen_seed: int | None) -> str:
 def _cross_seed_filename(cfg: JADEConfig) -> str:
     return (
         f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_r{cfg.lora_rank}_{cfg._supcon_tag}"
+        f"{cfg.pool_tag}_r{cfg.lora_rank}_{cfg._supcon_tag}_{cfg._optim_tag}"
         f"{cfg.mixup_tag}{cfg._mode_tags}_gen_cross_seed"
     )
 
