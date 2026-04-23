@@ -19,14 +19,14 @@ def _fold_filename(cfg: FTConfig, gen_seed: int | None) -> str:
     gen_tag = f"_gen_s{gen_seed}" if gen_seed is not None else ""
     return (
         f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_r{cfg.lora_rank}{cfg.mixup_tag}{cfg._mode_tags}{gen_tag}"
+        f"{cfg.pool_tag}_r{cfg.lora_rank}_{cfg._optim_tag}{cfg.mixup_tag}{cfg._mode_tags}{gen_tag}"
     )
 
 
 def _cross_seed_filename(cfg: FTConfig) -> str:
     return (
         f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
-        f"{cfg.pool_tag}_r{cfg.lora_rank}{cfg.mixup_tag}{cfg._mode_tags}_gen_cross_seed"
+        f"{cfg.pool_tag}_r{cfg.lora_rank}_{cfg._optim_tag}{cfg.mixup_tag}{cfg._mode_tags}_gen_cross_seed"
     )
 
 

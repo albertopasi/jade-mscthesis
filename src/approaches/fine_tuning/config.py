@@ -120,12 +120,16 @@ class FTConfig:
             tags += "_revesplit"
         return tags
 
+    @property
+    def _optim_tag(self) -> str:
+        return f"b{self.batch_size}_lr{self.ft_lr:g}"
+
     def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
         gen = f"_gen_s{gen_seed}" if gen_seed is not None else ""
         return (
             f"ft_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}{self.mixup_tag}{self._mode_tags}{gen}_fold_{fold_idx}"
+            f"r{self.lora_rank}_{self._optim_tag}{self.mixup_tag}{self._mode_tags}{gen}_fold_{fold_idx}"
         )
 
     def group_name(self) -> str:
@@ -133,7 +137,7 @@ class FTConfig:
         return (
             f"ft_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}{self.mixup_tag}{self._mode_tags}{gen}"
+            f"r{self.lora_rank}_{self._optim_tag}{self.mixup_tag}{self._mode_tags}{gen}"
         )
 
     def hparams_dict(
