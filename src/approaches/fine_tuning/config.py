@@ -14,9 +14,17 @@ from pathlib import Path
 from src.approaches.shared.config import (
     DATA_ROOTS,
     DATASET_DEFAULTS,
+    DEVICE,
+    NUM_WORKERS,
     PROJECT_ROOT,
     SAMPLING_RATE,
 )
+
+__all__ = [
+    "DEVICE",
+    "NUM_WORKERS",
+    "SAMPLING_RATE",
+]
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
