@@ -1,9 +1,35 @@
 # CLAUDE.md — jade-mscthesis
 
-MSc thesis project: reproduce and extend REVE linear probing downstream task on FACED and THU-EP EEG datasets.
-Future work will include (hence it is important to keep things modular and easily reusable/modifiable): 
-- Fine tuning REVE with LoRA, keeping linear head as in linear probing,
-- Enhance the fine tuning with lora using Supervised Contrastive Learning, attaching a projection head. Training will be joint: Total Loss will be  weighted sum of Cross Entropy Loss and SupCon Loss.
+MSc thesis project: reproduce and extend REVE for emotion recognition on EEG. Original plan was to compare LP, LoRA-FT, and JADE (LoRA + joint CE+SupCon). After extensive sweeps, the thesis has been refocused — see "Thesis status" section below.
+
+## Thesis status (current)
+
+**Operative plan**: see `docs/thesis_plan.md`. Methodology details: `docs/jade_hp_methodology.md`. Discussion of findings: `docs/jade_overall_analysis.md`. Raw results tables: `docs/jade_vs_ft_results.md`.
+
+**Scope decision**: FACED-deep-dive thesis, with two main axes — JADE-FullFT HP optimization and LoRA-vs-FullFT comparison. Generalization (stimulus-held-out) splits validate JADE within FACED. THU-EP is a secondary "cross-dataset transfer" finding (executed, reported as limitation, not investigated further).
+
+**Current best JADE-FullFT configs on FACED** (subject to bulletproof-sweep results):
+- 9-class: `α=0.3, τ=0.2, B=256, ft_lr=4e-4` → 62.61 ± 3.81 (Δ=+3.70 vs FT-FullFT B=256 baseline)
+- Binary: `α=0.3, τ=0.03, B=256, ft_lr=1e-4` → 77.33 ± 2.49 (Δ=+0.11 vs FT-FullFT B=256 baseline)
+
+**Key narrative finding**: SupCon's value is task-conditional. 9-class (positives-starved at default B=128) gains ~+3.7pp at B=256. Binary (already saturated) gains nothing once the FT baseline is properly LR-tuned.
+
+**Sweeps in-flight (do not duplicate)**:
+- `slurm/run_jade_bulletproof.sh` — 12 jobs filling Stage 1/3 grid holes + LR cross-checks for FACED.
+- `slurm/run_lr_holes.sh` — 1 job verifying lr=2e-4 for 9-class at full CV.
+- `slurm/run_faced_generalization.sh` — 4 jobs, 3 seeds × 10 folds each, stimulus-generalization on FACED.
+
+**Planned next**: 4 LoRA jobs (FT-LoRA × {9-class, binary} + JADE-LoRA × {9-class, binary}) at the bulletproof-sweep winners. Not yet submitted.
+
+**Important methodological norm**: when a JADE config departs from the REVE recipe (B=256, scaled LR), the FT-FullFT baseline must be re-run at the *same* recipe for a fair comparison. Never compare JADE@(new recipe) to FT@(old recipe).
+
+**HP tuning insights worth remembering**:
+- The original "binary +1.73pp SupCon win" was inflated by an under-tuned FT baseline. After tuning FT at lr=2e-4 B=256, the gap shrinks to +0.11.
+- Single-fold val_acc has ~1pp run-to-run variance. Single-fold rankings within ~1pp are *not* interpretable as HP effects; full 10-fold CV is required for any conclusion.
+- LR=8e-4 on 9-class gave the highest fold-1 val_acc but had cross-fold instability (training divergence on individual folds). Rejected for stability, not absolute accuracy.
+- B=512 OOMs on A100-80GB; B=256 fits at ~62 GB peak.
+
+**File-naming convention** (already implemented in JADE and FT pipelines): summary JSON / checkpoint dir / W&B run name include `_b{batch}_lr{ft_lr:g}` so different recipes don't collide.
 
 ## Always use `uv run python` to run anything (not plain `python`)
 

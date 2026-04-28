@@ -1,7 +1,7 @@
 # JADE Hyperparameter Optimization Methodology
 
 This document describes the sequential hyperparameter search used to identify
-the JADE training configuration on FACED. It is intended as the reference
+tbash slurm/run_lr_holes.shhe JADE training configuration on FACED. It is intended as the reference
 for the methodology section of the thesis. All metrics are 10-fold
 cross-subject CV val_acc × 100, unless explicitly marked as single-fold.
 
@@ -102,25 +102,30 @@ B=512 OOM (peak 79.2 GiB / 80 GB). **B=256 fits comfortably** (peak ~62 GB). All
 ### 2b — Learning-rate sweep at B=256
 
 **9-class (single fold, fold 1, α=0.3, τ=0.1).** Single-fold sweep used for
-direction-finding only — chosen value is verified at full 10-fold CV in
-Stage 3.
+*directional* ranking only — chosen value is determined by full 10-fold CV
+in Stage 3.
 
 | lr | val_acc (fold 1) |
 |:---:|:---:|
-| 5e-5 | _failed (env)_ |
 | 1e-4 | 0.6126 |
-| 2e-4 | _missing_ |
-| **4e-4** | **0.6639** |
-| 8e-4 | 0.6758 (best epoch reached safely; note: see stability) |
-| 1.5e-3 | _not run; would be unsafe per 8e-4 stability profile_ |
+| 2e-4 | 0.6703 |
+| 4e-4 | 0.6639 / 0.6593 (two runs at the same config) |
+| 8e-4 | 0.6758 |
+
+Run-to-run variance at fixed config (4e-4 above) is ~1pp on a single fold,
+so fold-1 differences within ~1pp are not interpretable as LR effects.
+Reliable conclusion: **lr=1e-4 is clearly worse; lr ∈ {2e-4, 4e-4, 8e-4}
+form a cluster within fold-1 noise.** Ranking within that cluster requires
+full CV.
 
 LR=8e-4 obtained the highest fold-1 val_acc (0.6758) but its training
 trajectory showed warmup instability (val_acc collapse to 0.15 at epoch 5
-before recovery). LR=4e-4 had no such instability. Both LRs were
-verified at full CV (Stage 3); the 4e-4 mean was higher and lower-variance.
+before recovery). LR ∈ {2e-4, 4e-4} had no such instability.
 
-**9-class Stage 2 winner: B=256, lr=4e-4** (single-fold-best lr=8e-4
-rejected for cross-fold instability — see Stage 3).
+**9-class Stage 2 winner: B=256, lr=4e-4** — selected by full 10-fold CV
+(Stage 3): mean=62.34, std=4.09. LR=8e-4 rejected for cross-fold
+instability (Stage 3: τ=0.2 had 2 folds diverge). LR=2e-4 not yet
+verified at full CV; if added, expected to be within ±1pp of 4e-4.
 
 **Binary (full 10-fold CV, α=0.2, τ=0.05).** A fold-1 sweep was skipped here:
 the LR space was small enough to run all candidates at full CV directly.
