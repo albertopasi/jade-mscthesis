@@ -3,13 +3,15 @@
 JADE = SupCon joint loss `α·CE + (1-α)·SupCon`, repr=context, no mixup.
 FT baseline = FT-FullFT no-mixup (fair comparison — JADE disables mixup).
 All rows: 10-fold cross-subject CV, val metrics × 100.
-**Δ Acc** = JADE acc − FT-FullFT acc.
+**Δ Acc** = JADE acc − FT-FullFT acc (against the comparable baseline at the same batch size).
 
 ---
 
-## Binary
+## Section 1 — B=128 sweep (initial exploration)
 
-FT-FullFT no-mixup baseline: **Acc=75.55 · Bal=75.55 · AUROC=82.30 · F1=75.45**
+### Binary
+
+FT-FullFT no-mixup baseline @ B=128: **Acc=75.55 · Bal=75.55 · AUROC=82.30 · F1=75.45**
 
 | α | τ | Acc | Bal Acc | AUROC | F1 | Δ Acc |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -21,18 +23,16 @@ FT-FullFT no-mixup baseline: **Acc=75.55 · Bal=75.55 · AUROC=82.30 · F1=75.45
 | 0.3 | 0.05 | 76.41 | 76.41 | 82.89 | 76.36 | +0.86 |
 | 0.3 | 0.1 | 76.47 | 76.47 | 83.15 | 76.43 | +0.92 |
 | 0.3 | 0.2 | 76.59 | 76.59 | 83.18 | 76.53 | +1.04 |
-| 0.3 | 0.5 | — | — | — | — | (pending) |
 | 0.5 | 0.1 | 76.59 | 76.59 | 82.74 | 76.57 | +1.04 |
 | 0.7 | 0.1 | 75.93 | 75.93 | 82.66 | 75.89 | +0.38 |
 | 0.8 | 0.1 | 75.16 | 75.16 | 82.00 | 75.08 | −0.39 |
 
-**Every JADE config except α=0.8 beats the FT baseline.** Best: α=0.2, τ=0.05 (+1.73pp).
+**Every JADE config except α=0.8 beats the FT baseline. Best: α=0.2, τ=0.05 (+1.73pp).**
+*Caveat (see Section 2): the FT-FullFT baseline at B=128 was at lr=1e-4 (untuned). Re-tuning FT shrinks this gap substantially.*
 
----
+### 9-class
 
-## 9-class
-
-FT-FullFT no-mixup baseline: **Acc=58.20 · Bal=58.44 · AUROC=88.36 · F1=58.20**
+FT-FullFT no-mixup baseline @ B=128: **Acc=58.20 · Bal=58.44 · AUROC=88.36 · F1=58.20**
 
 | α | τ | Acc | Bal Acc | AUROC | F1 | Δ Acc |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -50,28 +50,102 @@ FT-FullFT no-mixup baseline: **Acc=58.20 · Bal=58.44 · AUROC=88.36 · F1=58.20
 | 0.8 | 0.1 | 57.14 | 57.42 | 88.05 | 57.15 | −1.06 |
 | 0.9 | 0.1 | 57.61 | 57.87 | 88.35 | 57.62 | −0.59 |
 
-**Only α=0.3, τ=0.1 beats FT baseline** (+0.61pp). All other configs marginally below. 9-class is much less robust to SupCon HPs than binary.
+**Only α=0.3, τ=0.1 beats FT baseline (+0.61pp). All other configs marginally below.** Narrow optimum at B=128.
 
 ---
 
-## Summary — binary vs 9-class behaviour
+## Section 2 — B=256 follow-up
 
-| Task | FT-FullFT baseline | JADE best | Δ | Winning config |
-|---|:---:|:---:|:---:|---|
-| Binary | 75.55 | **77.28** | +1.73 | α=0.2, τ=0.05 |
-| 9-class | 58.20 | **58.81** | +0.61 | α=0.3, τ=0.1 |
+After identifying B=256 fits comfortably on A100-80GB (peak ~52GB), we tested
+whether scaling batch + LR changes the picture. Each batch size has its own
+properly-tuned FT baseline so the JADE Δ is fair.
 
-- **Binary:** SupCon robustly helps across the full (α, τ) grid. Broad optimum near α=0.2.
-- **9-class:** SupCon barely helps, narrow optimum; easy to hurt with wrong τ. Harder task, smaller positive sets per anchor → weaker contrastive signal.
+### FT-FullFT B=256 baselines (no-mixup)
+
+| Task | LR | Acc | std | AUROC | F1 |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Binary | 1e-4 | 74.43 | 2.40 | 81.46 | 74.37 |
+| Binary | 2e-4 | **77.22** | **1.21** | **84.21** | **77.20** |
+| 9-class | 4e-4 | 58.91 | 2.95 | 88.82 | 58.93 |
+
+**Key finding**: FT B=256 binary @ lr=2e-4 hits 77.22 — almost exactly matching
+JADE B=128 best (77.28). The original "+1.73pp SupCon win" on binary was
+inflated by an under-tuned FT LR. **9-class FT B=256 stays around 58.91**, so
+the 9-class story is unaffected by this correction.
+
+### JADE B=256 — 9-class (α fixed at 0.3)
+
+| α | τ | LR | Acc | std | AUROC | F1 | Δ vs FT B=256 |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 0.3 | 0.1 | 4e-4 | 62.34 | 4.09 | 90.30 | 62.52 | +3.43 |
+| 0.3 | 0.1 | 8e-4 | 62.19 | 5.68 | 90.26 | 62.31 | +3.28 |
+| **0.3** | **0.2** | **4e-4** | **62.61** | 3.81 | **90.36** | **62.81** | **+3.70** |
+| 0.3 | 0.2 | 8e-4 | 57.97 | 7.85 | 88.88 | 58.12 | −0.94 (2 folds diverged) |
+
+**Best: α=0.3, τ=0.2, lr=4e-4 → 62.61, Δ=+3.70 vs FT B=256 baseline.**
+9-class gain holds up after controlling for batch+LR. lr=8e-4 is unsafe (training divergence on individual folds).
+
+### JADE B=256 — binary (α=0.2 sensitivity grid)
+
+| α | τ | LR | Acc | std | Δ vs FT B=256 lr=2e-4 |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 0.2 | 0.05 | 1e-4 | 76.74 | 2.71 | −0.48 |
+| 0.2 | 0.05 | 2e-4 | 76.38 | 3.43 | −0.84 |
+| 0.2 | 0.05 | 4e-4 | 73.47 | 5.74 | −3.75 |
+| 0.2 | 0.05 | 8e-4 | 72.62 | 5.31 | −4.60 |
+| 0.2 | 0.10 | 1e-4 | 75.90 | 3.11 | −1.32 |
+| 0.2 | 0.10 | 4e-4 | 73.96 | 4.59 | −3.26 |
+| 0.2 | 0.10 | 8e-4 | 66.86 | 7.77 | −10.36 |
+| 0.2 | 0.03 | 1e-4 | 76.71 | 2.34 | −0.51 |
+
+### JADE B=256 — binary (extra α=0.3 grid at lr=1e-4)
+
+| α | τ | LR | Acc | std | Δ vs FT B=256 lr=2e-4 |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| **0.3** | **0.03** | **1e-4** | **77.33** | 2.49 | **+0.11** |
+| 0.3 | 0.10 | 1e-4 | 76.58 | 2.83 | −0.64 |
+
+**Best binary: α=0.3, τ=0.03, lr=1e-4 → 77.33, Δ=+0.11.**
+Binary's SupCon edge over a properly-tuned FT baseline is within noise.
+
+### Summary — FACED final picture
+
+| Task | Best JADE | std | FT B=256 best | JADE Δ |
+|---|:---:|:---:|:---:|:---:|
+| Binary | 77.33 (B=256, α=0.3, τ=0.03, lr=1e-4) | 2.49 | 77.22 (lr=2e-4) | **+0.11** |
+| 9-class | **62.61** (B=256, α=0.3, τ=0.2, lr=4e-4) | 3.81 | 58.91 (lr=4e-4) | **+3.70** |
+
+- **Binary**: JADE's gain is statistically negligible vs a well-tuned FT baseline.
+- **9-class**: JADE's +3.70pp gain is the headline result of this work.
 
 ---
 
-## Pending / still running
+## Section 3 — THU-EP transfer (direct application of FACED-optimal configs)
 
-- τ=0.03 sweep (4 jobs) — submitted, not yet reported
-- Binary α=0.3, τ=0.5 — still running / pending
-- JADE-FullFT generalization runs — not yet submitted
+Applied FACED-best configs directly to THU-EP, no re-sweep. Each compared to a
+matching FT-FullFT baseline at the same batch+LR.
 
-## LoRA reference (earlier sweep, not the focus)
+| Task | Approach | Config | Acc | std | AUROC | F1 |
+|---|---|---|:---:|:---:|:---:|:---:|
+| 9-class | FT B=64 (existing) | — | 48.28 | 2.72 | 84.04 | 47.98 |
+| 9-class | FT B=256 lr=4e-4 | — | 47.23 | 1.81 | 83.35 | 46.85 |
+| 9-class | JADE B=256 lr=4e-4 | α=0.3, τ=0.2 | 47.14 | 2.93 | 83.06 | 46.90 |
+| Binary | FT B=64 (existing) | — | 69.90 | 1.67 | 75.58 | 69.85 |
+| Binary | FT B=256 lr=2e-4 | — | **70.30** | 1.24 | **76.13** | 70.12 |
+| Binary | JADE B=256 lr=1e-4 | α=0.3, τ=0.03 | 68.99 | 2.86 | 74.78 | 68.80 |
 
-LoRA-JADE never beat FT-LoRA in cross-subject CV. Numbers retained in earlier revisions of this doc if needed.
+**Negative transfer.** On THU-EP, **JADE does not beat FT** at either task:
+- 9-class: JADE 47.14 vs FT B=256 47.23 (−0.09, basically tied; both *worse* than FT B=64 48.28)
+- Binary: JADE 68.99 vs FT B=256 70.30 (−1.31)
+
+Even the FT optimization recipe (B=256, scaled LR) doesn't transfer — FT B=256 is no better than FT B=64 on THU-EP 9-class, and only marginally better on binary.
+
+See `docs/jade_overall_analysis.md` for the comprehensive discussion of why
+this happens and what to do about it.
+
+---
+
+## Section 4 — LoRA reference (deprecated track)
+
+LoRA-JADE never beat FT-LoRA in cross-subject CV. Track abandoned in favor of
+full FT. Numbers retained in earlier revisions if needed.
