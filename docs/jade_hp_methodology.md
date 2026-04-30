@@ -171,13 +171,13 @@ Stage 3 sweeps a plus-shaped grid around the Stage 1 winner at the
 Stage 2 optimization recipe — α-axis at the working τ and τ-axis at the
 working α.
 
-### 9-class @ B=256, lr=4e-4
+### 9-class @ B=256, lr=4e-4 — complete 3 × 4 grid
 
 | α \ τ | 0.05 | 0.1 | 0.2 | 0.5 |
 |:---:|:---:|:---:|:---:|:---:|
-| 0.2 | — | 60.76±6.74 | 58.08±6.97 | — |
+| 0.2 | 60.89±3.83 | 60.76±6.74 | 58.08±6.97 | 61.21±3.06 |
 | **0.3** | 61.90±3.40 | 62.34±4.09 | **62.61±3.81** | 60.79±3.99 |
-| 0.5 | — | — | 61.62±4.87 | — |
+| 0.5 | 61.16±3.10 | 61.38±3.57 | 61.62±4.87 | 60.14±4.01 |
 
 **LR=8e-4 cross-check** (same α=0.3 row): τ=0.1 → 62.19±5.68; τ=0.2 → 57.97±7.85 (2 folds diverged).
 **LR=2e-4, 1e-4 cross-check** at (α=0.3, τ=0.2): see §4.4.
@@ -187,16 +187,34 @@ working α.
 τ shifted from 0.1 (Stage 1) to 0.2 — consistent with the
 positives-per-anchor mechanism: at B=256 each anchor sees ~28 positives
 vs ~14 at B=128, so a softer (higher-τ) loss is now preferable.
-The plus-shape confirms this is a local maximum on both axes:
-α=0.2 (58.08) and α=0.5 (61.62) at τ=0.2 are below 62.61, and τ ∈ {0.05, 0.1, 0.5} at α=0.3 are also below.
+The complete grid confirms this is a local maximum:
 
-### Binary @ B=256, lr=1e-4
+- **α-axis at the winning τ=0.2**: 58.08 (α=0.2) → **62.61** (α=0.3) → 61.62 (α=0.5). Smooth peak.
+- **τ-axis at the winning α=0.3**: 61.90 → 62.34 → **62.61** → 60.79. Smooth peak.
+- **α=0.5 row**: 61.16 → 61.38 → 61.62 → 60.14. A flat plateau ~1pp below the winner — α=0.5 is consistently sub-optimal at every τ.
+- **α=0.2 row**: irregular (60.89 → 60.76 → 58.08 → 61.21) with high std at τ ∈ {0.1, 0.2} (6.74, 6.97). Suggests training instability when SupCon dominates strongly enough (low α) at moderate τ. Not a competitive regime.
+
+### Binary @ B=256, lr=1e-4 — complete 3 × 5 grid
 
 | α \ τ | 0.03 | 0.05 | 0.1 | 0.2 | 0.5 |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| 0.2 | 76.71±2.34 | 76.74±2.71 | 75.90±3.11 | — | — |
+| 0.2 | 76.71±2.34 | 76.74±2.71 | 75.90±3.11 | 75.95±3.22 | 75.43±1.90 |
 | **0.3** | **77.33±2.49** | 75.95±2.02 | 76.58±2.83 | 76.22±2.02 | 76.36±2.11 |
-| 0.5 | 76.48±3.16 | — | — | — | — |
+| 0.5 | 76.48±3.16 | 76.15±2.56 | 75.95±1.34 | 76.51±2.59 | 77.36±3.32 |
+
+The completed grid reveals a **flat, multi-plateaued landscape**: two
+cells reach the ~77.3 region — (α=0.3, τ=0.03) → 77.33 and (α=0.5, τ=0.5)
+→ 77.36 — at opposite corners of the grid, with no monotonic gradient
+connecting them. The α=0.5/τ=0.5 cell has the highest std (3.32) of any
+binary cell tested; the α=0.3/τ=0.03 cell is more stable (std 2.49). The
+remaining 13 cells sit between 75.4 and 76.7 — all within ~2pp of the
+plateau, all within fold-noise of one another.
+
+This pattern is a finding in itself: under B=256 the binary loss
+landscape **has no clear (α, τ) optimum** — multiple disconnected cells
+reach the same accuracy, and no axis carves out a coherent maximum. The
+B=128 sweep, by contrast (§3 binary table), had a cleaner peak at
+α=0.2, τ=0.05 with lower variance and a smoother surrounding region.
 
 **Stage 3 winner (binary): α=0.3, τ=0.03, B=256, lr=1e-4 → 77.33 (Δ=+0.11 vs FT B=256 baseline 77.22).**
 
@@ -246,15 +264,21 @@ preferred for the following reasons:
    (binary's "no scaling needed" narrative becomes "we used the same
    recipe but it did not help"), losing the mechanistic story.
 
-4. **Robustness under verification.** The B=256 binary recipe was tested
-   at lr ∈ {1e-4, 2e-4, 4e-4, 8e-4} (§4.3); none improved over the
-   B=128 result, and lr ∈ {4e-4, 8e-4} actively degraded performance.
-   The B=256 plus-shape (§5) found a different local optimum (α=0.3,
-   τ=0.03) than the B=128 sweep (α=0.2, τ=0.05). The fact that the
-   optimum *shifts* between batch sizes — without yielding a meaningful
-   accuracy gain — is itself evidence that B=256 is not a net
-   improvement; both regimes find competing local plateaux of similar
-   height.
+4. **Robustness under verification.** The B=256 binary recipe was
+   tested at lr ∈ {1e-4, 2e-4, 4e-4, 8e-4} (§4.3); none improved over
+   the B=128 result, and lr ∈ {4e-4, 8e-4} actively degraded
+   performance. With the **complete 3 × 5 grid** at lr=1e-4 now in hand
+   (§5), two cells reach ~77.3 — (α=0.3, τ=0.03) → 77.33 and (α=0.5,
+   τ=0.5) → 77.36 — at opposite ends of the grid with no smooth
+   trajectory between them; the remaining 13 cells sit ~1–2 pp below.
+   Under B=256 the binary loss landscape is **flat with multiple
+   disconnected local plateaux at ~77 pp**, none distinguishable from
+   the B=128 winner (77.28 ± 1.29). Under B=128, by contrast, the
+   landscape has a cleaner peak (α=0.2, τ=0.05) with surrounding cells
+   smoothly degrading. The B=256 grid does not surface a meaningful
+   improvement; it surfaces noise. This is direct evidence that
+   B=256 is not a net improvement for binary, beyond the per-cell
+   accuracy comparisons.
 
 The B=256 binary plus-shape data is retained in §5 as control
 evidence: it is the experimental record that batch scaling, properly
@@ -307,13 +331,16 @@ the same FT re-tuning.
 
 ## 8. Coverage status
 
-All cells in §3, §4, §5 are filled at full 10-fold CV. No outstanding
-holes in the documented grids.
+All cells in §3 (Stage 1) and §5 (Stage 3) are filled at full 10-fold CV:
+- **Stage 1 9-class**: 2 × 5 main grid + 5-cell α-extreme ablation — complete.
+- **Stage 1 binary**: 2 × 5 main grid + 5-cell α-extreme ablation — complete.
+- **Stage 3 9-class**: full 3 × 4 grid at B=256, lr=4e-4 — complete.
+- **Stage 3 binary**: full 3 × 5 grid at B=256, lr=1e-4 — complete.
+- **LR cross-checks** (§4.4): full CV at lr ∈ {1e-4, 2e-4, 4e-4, 8e-4}
+  for 9-class at the Stage 3 winner — complete.
 
-Optional further work (low-priority):
-- **9-class α=0.2, τ ∈ {0.05, 0.5}** at B=256, lr=4e-4 — would extend the
-  α-axis at the high-τ region. Not strictly needed; α=0.2 already shown
-  to be sub-optimal at τ ∈ {0.1, 0.2}.
-- **Binary α=0.5 τ ∈ {0.05, 0.1, 0.2, 0.5}** at B=256, lr=1e-4 — would
-  extend the α-axis. Not needed; α=0.5 already shown to be sub-optimal
-  at τ=0.03.
+**Pending (binary low-LR sanity checks, in flight)**: lr=5e-5 at the
+B=128 winner (α=0.2, τ=0.05) and at the B=256 winner (α=0.3, τ=0.03).
+These verify that lr=1e-4 is not dominated by smaller LR at either
+batch size. Results expected to confirm the chosen LR; will be added
+to §4 once available.
