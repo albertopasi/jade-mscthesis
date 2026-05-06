@@ -120,7 +120,84 @@ Binary's SupCon edge over a properly-tuned FT baseline is within noise.
 
 ---
 
-## Section 3 — THU-EP transfer (direct application of FACED-optimal configs)
+## Section 3 — FACED stimulus-generalization (3 seeds × 10 folds)
+
+Generalization protocol: for each of 3 seeds {123, 456, 789}, randomly
+split the 28 stimuli of each emotion class so that 2/3 are in the train
+set and 1/3 are held out for validation. Cross-subject 10-fold CV is
+applied independently on top of each stimulus split. Reported below: per-seed
+val_acc and 3-seed mean ± seed-std.
+
+All configs use the bulletproof-CV winners (see Section 2):
+- 9-class: B=256, lr=4e-4, JADE α=0.3, τ=0.2 / FT no-mixup
+- Binary:  B=128, lr=1e-4, JADE α=0.2, τ=0.05 / FT no-mixup
+- LP: official mode (frozen encoder, B=64, lr=5e-3)
+
+Hyperparameters were selected on cross-subject CV and applied unchanged
+(standard train/val/test methodology — no re-tuning on the gen split).
+
+### 9-class (chance = 11.1%)
+
+| Approach | s123 | s456 | s789 | mean ± std (over seeds) |
+|---|:---:|:---:|:---:|:---:|
+| LP (frozen) | 15.81±1.49 | 15.67±1.21 | 16.00±1.51 | **15.83 ± 0.17** |
+| FT-FullFT B=256 | 15.36±1.18 | 14.69±1.12 | 15.76±1.52 | **15.27 ± 0.54** |
+| JADE-FullFT B=256 | 15.95±1.07 | 14.09±1.22 | 15.93±1.49 | **15.32 ± 1.07** |
+
+3-seed AUROC: LP 53.82±0.41 · FT 53.09±0.70 · JADE 52.58±1.18.
+3-seed F1: LP 12.15±0.83 · FT 12.72±0.71 · JADE 11.38±0.51.
+
+### Binary (chance = 50.0%)
+
+| Approach | s123 | s456 | s789 | mean ± std (over seeds) |
+|---|:---:|:---:|:---:|:---:|
+| LP (frozen) | 58.74±3.18 | 60.44±3.38 | 56.19±1.49 | **58.46 ± 2.14** |
+| FT-FullFT B=128 | 61.12±3.81 | 59.97±4.29 | 58.49±2.47 | **59.86 ± 1.32** |
+| JADE-FullFT B=128 | 60.65±2.45 | 61.61±2.96 | 59.56±2.98 | **60.61 ± 1.03** |
+
+3-seed AUROC: LP 59.82±3.13 · FT 61.31±2.06 · JADE 61.91±0.88.
+3-seed F1: LP 56.86±2.15 · FT 59.09±1.48 · JADE 59.52±0.60.
+
+### Comparison to cross-subject CV
+
+| Task | Approach | CV acc | Gen acc (3-seed) | Drop |
+|---|---|:---:|:---:|:---:|
+| 9-class | FT-FullFT B=256 | 58.91 | 15.27 | −43.64 |
+| 9-class | JADE-FullFT B=256 | 62.61 | 15.32 | −47.29 |
+| Binary | FT-FullFT B=128 (matched) | not measured at B=128 | 59.86 | n/a |
+| Binary | JADE-FullFT B=128 | 77.28 | 60.61 | −16.67 |
+
+JADE − FT delta (gen vs CV):
+- **9-class**: CV Δ = +3.70 → gen Δ = **+0.05** (collapses to a tie).
+- **Binary**: CV Δ = +1.73 (vs B=128 FT not directly measured; vs B=256 FT-tuned baseline 77.22, CV Δ = +0.11) → **gen Δ = +0.75** (small but consistent across all 3 seeds).
+
+### What can be claimed from these tables
+
+- **All three methods lose substantially.** 9-class drops to within ~4pp of
+  the 11.1% chance baseline; binary drops to within ~10pp of the 50% chance
+  baseline.
+- **The CV ranking (LP < FT < JADE) is preserved on binary** under stimulus
+  shift — LP 58.46 < FT 59.86 < JADE 60.61. Gaps shrink from CV (~3pp range)
+  to gen (~2pp range), but the order is robust across all 3 seeds.
+- **The CV ranking collapses on 9-class** — LP 15.83, FT 15.27, JADE 15.32
+  are statistically tied; LP's mean is even slightly highest. 9-class CV's
+  +3.70 JADE win does not transfer.
+- **JADE 9-class has the highest seed-to-seed variance** (std=1.07 vs
+  LP=0.17, FT=0.54) — its gen result depends more on which 1/3 of stimuli
+  are held out. Consistent with a model that organizes more aggressively
+  around training stimuli, but not directly tested.
+
+### What cannot be claimed
+
+We do not directly observe whether the model is "memorizing stimuli." The
+generalization drop and the JADE-FT collapse on 9-class are consistent
+with stimulus-specific feature learning, but neither LP-vs-FT nor
+JADE-vs-FT differences directly probe representation content. Mechanism
+discussion is in `docs/jade_overall_analysis.md`.
+
+---
+
+## Section 4 — THU-EP transfer (direct application of FACED-optimal configs)
 
 Applied FACED-best configs directly to THU-EP, no re-sweep. Each compared to a
 matching FT-FullFT baseline at the same batch+LR.
@@ -145,7 +222,7 @@ this happens and what to do about it.
 
 ---
 
-## Section 4 — LoRA reference (deprecated track)
+## Section 5 — LoRA reference (deprecated track)
 
 LoRA-JADE never beat FT-LoRA in cross-subject CV. Track abandoned in favor of
 full FT. Numbers retained in earlier revisions if needed.
