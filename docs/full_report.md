@@ -454,17 +454,17 @@ JADE 9-class generalization is essentially tied with FT and LP (15.32 vs
 - ✓ The cross-method ranking (LP < FT < JADE) is preserved on binary
   generalization.
 - ✓ The cross-method ranking *collapses* on 9-class generalization.
-- ✗ We do not directly observe whether JADE's representations are more
-  stimulus-specific than FT's. The collapse on 9-class is consistent
-  with stimulus-driven feature learning, but mechanism is not directly
-  tested.
 
 ---
 
-## 11. Outstanding work and limitations
+## 11. Future Plans
 
+- **Confusion Matrices**: which emotions are more frequently predicted correctly and what are the most common prediction mistakes
+
+POSSIBLE FUTURE WORK (if there is time/if what I have now is not enough):
 - **LoRA reference**: earlier LoRA-based runs were inconclusive at the
   un-tuned recipe and are not the focus of this report. A re-evaluation
   at the bulletproof CV recipes is planned.
 - **Cross-dataset transfer**: testing on THU-EP under direct application
   of FACED-optimal configs, early result FT and JADE underperform: would need extensive investigation and retuning HPs
+- **Channel importance**: Run a backward pass from the predicted class logit back to the raw EEG input (B, C, T). The gradient magnitude per channel gives electrode importance.
