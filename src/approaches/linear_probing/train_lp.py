@@ -51,15 +51,13 @@ from torch.utils.data import DataLoader, TensorDataset
 import wandb
 from src.approaches.linear_probing.config import (
     ACCELERATOR,
-    DEVICE,
-    NUM_WORKERS,
     OUTPUT_DIR,
-    SAMPLING_RATE,
     USE_WANDB,
     WANDB_ENTITY,
     WANDB_PROJECT,
     LPConfig,
 )
+from src.approaches.shared.config import DEVICE, NUM_WORKERS, SAMPLING_RATE
 from src.approaches.linear_probing.model import (
     EmbeddingExtractor,
     LinearProber,
