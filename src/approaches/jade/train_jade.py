@@ -44,7 +44,6 @@ import copy
 import datetime
 import gc
 import json
-import shutil
 import statistics
 import sys
 import time
@@ -262,6 +261,7 @@ def run_fold_jade(
 
     # Save checkpoint
     ckpt_dir = None
+    val_preds: dict | None = None
     if ft_result.get("best_state"):
         ckpt_dir = OUTPUT_DIR / run_name
         ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -269,6 +269,18 @@ def run_fold_jade(
         # Restore best FT state
         model.load_state_dict(ft_result["best_state"])
         model.to(DEVICE)
+
+        # Collect per-window predictions on val set at the best checkpoint.
+        # Used downstream to build the cross-fold confusion matrix and P/R/F1.
+        eval_out = evaluate_model(
+            model,
+            val_loader,
+            device=DEVICE,
+            n_classes=cfg.num_classes,
+            use_amp=cfg.use_amp,
+            return_preds=True,
+        )
+        val_preds = {"y_true": eval_out["y_true"], "y_pred": eval_out["y_pred"]}
 
         if cfg.full_ft:
             # Full fine-tuning: save entire state dict (excluding projection head)
@@ -393,6 +405,9 @@ def run_fold_jade(
         "lp_val_acc": lp_result.get("val_acc"),
         "ckpt_dir": ckpt_dir,
     }
+    if val_preds is not None:
+        result["y_true"] = val_preds["y_true"]
+        result["y_pred"] = val_preds["y_pred"]
     if test_metrics is not None:
         result.update(
             {
@@ -719,8 +734,6 @@ def main() -> None:
             print(f"{'=' * COL_W}")
 
         fold_results: list[dict] = []
-        best_ckpt_dir: Path | None = None
-        best_ckpt_acc: float = -1.0
 
         for fold_idx, (train_idx, val_idx) in folds_to_run:
             train_subjects = [all_subjects[i] for i in train_idx]
@@ -738,23 +751,6 @@ def main() -> None:
                 gen_seed=gen_seed,
             )
             fold_results.append(result)
-
-            # Keep only the best fold's checkpoint on disk.
-            fold_acc = result.get("val_acc") or 0.0
-            fold_ckpt = result.get("ckpt_dir")
-            if fold_ckpt is not None:
-                if fold_acc > best_ckpt_acc:
-                    if best_ckpt_dir is not None and best_ckpt_dir.exists():
-                        shutil.rmtree(best_ckpt_dir)
-                        print(f"  [ckpt] Removed previous best: {best_ckpt_dir.name}")
-                    best_ckpt_acc = fold_acc
-                    best_ckpt_dir = fold_ckpt
-                    print(
-                        f"  [ckpt] New best: fold {fold_idx}  val_acc={fold_acc:.4f}  → {fold_ckpt.name}"
-                    )
-                else:
-                    shutil.rmtree(fold_ckpt)
-                    print(f"  [ckpt] Removed (not best, val_acc={fold_acc:.4f}): {fold_ckpt.name}")
 
         if len(fold_results) > 1:
             print_fold_summary(
@@ -776,7 +772,12 @@ def main() -> None:
                     "mean_auroc": round(statistics.mean(aurocs), 4) if aurocs else None,
                     "mean_f1": round(statistics.mean(f1s), 4) if f1s else None,
                     "folds": [
-                        {k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results
+                        {
+                            k: v
+                            for k, v in r.items()
+                            if k not in ("ckpt_dir", "y_true", "y_pred")
+                        }
+                        for r in fold_results
                     ],
                 }
             )

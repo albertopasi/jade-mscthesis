@@ -13,6 +13,8 @@ import math
 import statistics
 from pathlib import Path
 
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
+
 COL_W = 90
 
 
@@ -28,6 +30,70 @@ def _stat(vals: list[float]) -> tuple[str, str]:
     mean = statistics.mean(vals)
     std = statistics.stdev(vals) if len(vals) > 1 else 0.0
     return f"{mean:.4f}", f"{std:.4f}"
+
+
+def _pooled_classification_report(fold_results: list[dict]) -> dict | None:
+    """Pool y_true/y_pred across folds and compute per-class P/R/F1 + confusion matrix.
+
+    Returns None if no fold has predictions saved. In 10-fold cross-subject CV each
+    sample appears in exactly one val split, so pooling gives one prediction per
+    window across the full dataset.
+    """
+    y_true: list[int] = []
+    y_pred: list[int] = []
+    for r in fold_results:
+        if r.get("y_true") is not None and r.get("y_pred") is not None:
+            y_true.extend(r["y_true"])
+            y_pred.extend(r["y_pred"])
+    if not y_true:
+        return None
+
+    labels = sorted(set(y_true) | set(y_pred))
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+    precision, recall, f1, support = precision_recall_fscore_support(
+        y_true, y_pred, labels=labels, zero_division=0
+    )
+    macro_p, macro_r, macro_f1, _ = precision_recall_fscore_support(
+        y_true, y_pred, labels=labels, average="macro", zero_division=0
+    )
+
+    return {
+        "labels": labels,
+        "confusion_matrix": cm.tolist(),
+        "per_class": {
+            "precision": [round(float(p), 4) for p in precision],
+            "recall": [round(float(r), 4) for r in recall],
+            "f1": [round(float(f), 4) for f in f1],
+            "support": [int(s) for s in support],
+        },
+        "macro": {
+            "precision": round(float(macro_p), 4),
+            "recall": round(float(macro_r), 4),
+            "f1": round(float(macro_f1), 4),
+        },
+        "n_samples": len(y_true),
+    }
+
+
+def _print_classification_report(report: dict) -> None:
+    print(f"\n{'=' * COL_W}")
+    print(f"  POOLED CLASSIFICATION REPORT  (n={report['n_samples']} windows)")
+    print(f"{'=' * COL_W}")
+    header = f"{'Class':>6}  {'Precision':>10}  {'Recall':>10}  {'F1':>10}  {'Support':>9}"
+    print(header)
+    print("-" * len(header))
+    pc = report["per_class"]
+    for i, lbl in enumerate(report["labels"]):
+        print(
+            f"{lbl:>6}  {pc['precision'][i]:>10.4f}  {pc['recall'][i]:>10.4f}  "
+            f"{pc['f1'][i]:>10.4f}  {pc['support'][i]:>9d}"
+        )
+    print("-" * len(header))
+    m = report["macro"]
+    print(
+        f"{'Macro':>6}  {m['precision']:>10.4f}  {m['recall']:>10.4f}  {m['f1']:>10.4f}"
+    )
+    print(f"{'=' * COL_W}")
 
 
 def print_fold_summary(
@@ -108,9 +174,30 @@ def print_fold_summary(
     print(f"{'Std':>5}  {tl_std:>8}  {acc_std:>8}  {bal_std:>10}  {aur_std:>9}  {f1_std:>8}")
     print(f"{'=' * COL_W}")
 
-    # Save aggregate JSON
+    # Pooled per-class report (only when folds carry y_true/y_pred)
+    classification_report = _pooled_classification_report(fold_results)
+    predictions_by_fold: list[dict] | None = None
+    if classification_report is not None:
+        _print_classification_report(classification_report)
+        # Move raw predictions out of per-fold rows into a dedicated top-level
+        # field so per-fold rows stay compact but predictions remain available
+        # for post-hoc analysis (e.g. subject-level breakdowns).
+        predictions_by_fold = [
+            {"fold": r["fold"], "y_true": r["y_true"], "y_pred": r["y_pred"]}
+            for r in fold_results
+            if r.get("y_true") is not None and r.get("y_pred") is not None
+        ]
+        fold_results = [
+            {k: v for k, v in r.items() if k not in ("y_true", "y_pred")}
+            for r in fold_results
+        ]
+
+    # Save aggregate JSON. When fold results carry predictions, append a
+    # `_confmat` suffix so the new (richer) summary doesn't clobber any
+    # existing summary file produced by an older run at the same config.
     output_dir.mkdir(parents=True, exist_ok=True)
-    agg_path = output_dir / f"{filename_stem}.json"
+    suffix = "_confmat" if classification_report is not None else ""
+    agg_path = output_dir / f"{filename_stem}{suffix}.json"
     agg = {
         "dataset": cfg.dataset,
         "task_mode": cfg.task_mode,
@@ -134,6 +221,9 @@ def print_fold_summary(
         },
         "folds": fold_results,
     }
+    if classification_report is not None:
+        agg["classification_report"] = classification_report
+        agg["predictions_by_fold"] = predictions_by_fold
     if extra_json:
         agg.update(extra_json)
     with open(agg_path, "w", encoding="utf-8") as f:

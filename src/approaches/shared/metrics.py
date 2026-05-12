@@ -25,11 +25,13 @@ def evaluate_model(
     device: str = "cuda",
     n_classes: int = 9,
     use_amp: bool = True,
+    return_preds: bool = False,
 ) -> dict:
     """Evaluate model on a dataloader, returning official REVE metrics.
 
     Returns dict with keys: accuracy, balanced_acc, f1_weighted,
-    auroc (binary only), auc_pr (binary only).
+    auroc (binary only), auc_pr (binary only). When return_preds=True,
+    also returns y_true and y_pred (lists of ints) for the entire loader.
     """
     model.eval()
     device_type = "cuda" if "cuda" in device else "cpu"
@@ -84,5 +86,9 @@ def evaluate_model(
             metrics["auroc"] = roc_auc_score(gt, probs_softmax, multi_class="ovr", average="macro")
     except ValueError:
         pass  # too few classes in fold (e.g. single-class val split)
+
+    if return_preds:
+        metrics["y_true"] = gt.astype(int).tolist()
+        metrics["y_pred"] = pr.astype(int).tolist()
 
     return metrics
