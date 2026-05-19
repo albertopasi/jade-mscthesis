@@ -261,7 +261,6 @@ def run_fold_jade(
 
     # Save checkpoint
     ckpt_dir = None
-    val_preds: dict | None = None
     if ft_result.get("best_state"):
         ckpt_dir = OUTPUT_DIR / run_name
         ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -269,18 +268,6 @@ def run_fold_jade(
         # Restore best FT state
         model.load_state_dict(ft_result["best_state"])
         model.to(DEVICE)
-
-        # Collect per-window predictions on val set at the best checkpoint.
-        # Used downstream to build the cross-fold confusion matrix and P/R/F1.
-        eval_out = evaluate_model(
-            model,
-            val_loader,
-            device=DEVICE,
-            n_classes=cfg.num_classes,
-            use_amp=cfg.use_amp,
-            return_preds=True,
-        )
-        val_preds = {"y_true": eval_out["y_true"], "y_pred": eval_out["y_pred"]}
 
         if cfg.full_ft:
             # Full fine-tuning: save entire state dict (excluding projection head)
@@ -405,9 +392,7 @@ def run_fold_jade(
         "lp_val_acc": lp_result.get("val_acc"),
         "ckpt_dir": ckpt_dir,
     }
-    if val_preds is not None:
-        result["y_true"] = val_preds["y_true"]
-        result["y_pred"] = val_preds["y_pred"]
+
     if test_metrics is not None:
         result.update(
             {
@@ -772,12 +757,7 @@ def main() -> None:
                     "mean_auroc": round(statistics.mean(aurocs), 4) if aurocs else None,
                     "mean_f1": round(statistics.mean(f1s), 4) if f1s else None,
                     "folds": [
-                        {
-                            k: v
-                            for k, v in r.items()
-                            if k not in ("ckpt_dir", "y_true", "y_pred")
-                        }
-                        for r in fold_results
+                        {k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results
                     ],
                 }
             )
