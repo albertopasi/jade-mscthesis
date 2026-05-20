@@ -42,7 +42,6 @@ import copy
 import datetime
 import gc
 import json
-import shutil
 import statistics
 import sys
 import time
@@ -647,8 +646,6 @@ def main() -> None:
             print(f"{'=' * COL_W}")
 
         fold_results: list[dict] = []
-        best_ckpt_dir: Path | None = None
-        best_ckpt_acc: float = -1.0
 
         for fold_idx, (train_idx, val_idx) in folds_to_run:
             train_subjects = [all_subjects[i] for i in train_idx]
@@ -666,25 +663,6 @@ def main() -> None:
                 gen_seed=gen_seed,
             )
             fold_results.append(result)
-
-            # Keep only the best fold's checkpoint on disk.
-            fold_acc = result.get("val_acc") or 0.0
-            fold_ckpt = result.get("ckpt_dir")
-            if fold_ckpt is not None:
-                if fold_acc > best_ckpt_acc:
-                    # New best — delete the previous best checkpoint.
-                    if best_ckpt_dir is not None and best_ckpt_dir.exists():
-                        shutil.rmtree(best_ckpt_dir)
-                        print(f"  [ckpt] Removed previous best: {best_ckpt_dir.name}")
-                    best_ckpt_acc = fold_acc
-                    best_ckpt_dir = fold_ckpt
-                    print(
-                        f"  [ckpt] New best: fold {fold_idx}  val_acc={fold_acc:.4f}  → {fold_ckpt.name}"
-                    )
-                else:
-                    # Not better — delete immediately.
-                    shutil.rmtree(fold_ckpt)
-                    print(f"  [ckpt] Removed (not best, val_acc={fold_acc:.4f}): {fold_ckpt.name}")
 
         if len(fold_results) > 1:
             print_fold_summary(
