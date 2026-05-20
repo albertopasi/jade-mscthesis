@@ -25,7 +25,8 @@ Usage:
 REVE paths default to local models/reve_pretrained_original/. Override
 with --reve-base / --reve-pos if needed.
 
-Output JSON written to: <ckpt-root>/inference_<run-stem>.json
+Output JSON written to: main-results/<approach>_<task>/<run-stem>.json
+(e.g. main-results/lp_9-class/, main-results/ft_binary/, main-results/jade_9-class/)
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, roc_auc_score
 from torch.utils.data import DataLoader
 
 from src.approaches.fine_tuning.model import ReveClassifierFT
@@ -80,7 +81,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lora-rank", type=int, default=16,
                    help="LoRA rank (FT/JADE — only matters when reading non-fullft checkpoints).")
     p.add_argument("--out-path", type=Path, default=None,
-                   help="Output JSON path. Default: <ckpt-root>/inference_<run-stem>.json")
+                   help="Output JSON path. Default: main-results/<approach>_<task>/<run-stem>.json")
     return p.parse_args()
 
 
@@ -175,15 +176,18 @@ def infer_one_fold(
     """
     loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
     model.eval()
-    y_true_all, y_pred_all = [], []
+    y_true_all, y_pred_all, y_prob_all = [], [], []
     for eeg, label in loader:
         eeg = eeg.to(device, non_blocking=True)
         logits = model(eeg)
+        probs = torch.softmax(logits, dim=-1).cpu().numpy()
         preds = logits.argmax(dim=-1).cpu().numpy()
         y_pred_all.append(preds)
+        y_prob_all.append(probs)
         y_true_all.append(label.numpy())
     y_true = np.concatenate(y_true_all).astype(int)
     y_pred = np.concatenate(y_pred_all).astype(int)
+    y_prob = np.concatenate(y_prob_all).astype(np.float32)
     # Subject id per window: dataset.index[i] = (sid, stim_idx, window_start)
     subj_ids = np.array([val_ds.index[i][0] for i in range(len(val_ds))], dtype=int)
     assert len(subj_ids) == len(y_true), f"index mismatch {len(subj_ids)} vs {len(y_true)}"
@@ -199,6 +203,7 @@ def infer_one_fold(
     return {
         "y_true": y_true.tolist(),
         "y_pred": y_pred.tolist(),
+        "y_prob": y_prob,
         "subj_ids": subj_ids.tolist(),
         "per_subject_acc": per_subject_acc,
         "per_subject_support": per_subject_support,
@@ -239,6 +244,8 @@ def main() -> None:
     pooled_per_subject_support: dict[int, int] = {}
     pooled_y_true: list[int] = []
     pooled_y_pred: list[int] = []
+    pooled_y_prob: list[np.ndarray] = []
+    pooled_subj_ids: list[int] = []
 
     for fold_idx in range(1, args.n_folds + 1):
         ckpt_dir = args.ckpt_root / f"{args.run_stem}_fold_{fold_idx}"
@@ -287,6 +294,8 @@ def main() -> None:
 
         pooled_y_true.extend(out["y_true"])
         pooled_y_pred.extend(out["y_pred"])
+        pooled_y_prob.append(out["y_prob"])
+        pooled_subj_ids.extend(out["subj_ids"])
 
         # Free memory
         del model, val_ds
@@ -317,8 +326,30 @@ def main() -> None:
         print(f"  {lbl:>6}  {precision[i]:>8.4f}  {recall[i]:>8.4f}  {f1[i]:>8.4f}  {int(support[i]):>8d}")
     print(f"  {'macro':>6}  {macro_p:>8.4f}  {macro_r:>8.4f}  {macro_f1:>8.4f}")
 
+    # AUROC (one-vs-rest, pooled across all windows)
+    pooled_y_prob_arr = np.concatenate(pooled_y_prob, axis=0)
+    pooled_y_true_arr = np.array(pooled_y_true, dtype=int)
+    n_classes = pooled_y_prob_arr.shape[1]
+    auroc_per_class: list[float] = []
+    for i in range(n_classes):
+        y_bin = (pooled_y_true_arr == labels[i]).astype(int)
+        if y_bin.sum() == 0 or y_bin.sum() == len(y_bin):
+            auroc_per_class.append(float("nan"))
+        else:
+            auroc_per_class.append(float(roc_auc_score(y_bin, pooled_y_prob_arr[:, i])))
+    if n_classes == 2:
+        macro_auroc = float(roc_auc_score(pooled_y_true_arr, pooled_y_prob_arr[:, 1]))
+    else:
+        macro_auroc = float(roc_auc_score(
+            pooled_y_true_arr, pooled_y_prob_arr,
+            multi_class="ovr", average="macro", labels=labels,
+        ))
+    print(f"\n  AUROC (macro, one-vs-rest): {macro_auroc:.4f}")
+    print(f"  AUROC per-class: " + ", ".join(f"{a:.3f}" for a in auroc_per_class))
+
     # ── Write JSON ───────────────────────────────────────────────────────────
-    out_path = args.out_path or (args.ckpt_root / f"inference_{args.run_stem}.json")
+    out_dir = project_root / "main-results" / f"{args.approach}_{args.task}"
+    out_path = args.out_path or (out_dir / f"{args.run_stem}.json")
     summary = {
         "approach": args.approach,
         "task": args.task,
@@ -348,7 +379,9 @@ def main() -> None:
                 "precision": round(float(macro_p), 4),
                 "recall":    round(float(macro_r), 4),
                 "f1":        round(float(macro_f1), 4),
+                "auroc":     round(macro_auroc, 4),
             },
+            "auroc_per_class": [round(a, 4) for a in auroc_per_class],
         },
         "per_subject_acc": {str(sid): acc for sid, acc in pooled_per_subject_acc.items()},
         "per_subject_support": {str(sid): n for sid, n in pooled_per_subject_support.items()},
@@ -361,6 +394,18 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(summary, indent=2))
     print(f"\nSaved → {out_path}")
+
+    # Also save raw per-window arrays for downstream plotting (ROC, etc.)
+    npz_path = out_path.with_suffix(".npz")
+    np.savez_compressed(
+        npz_path,
+        y_true=np.array(pooled_y_true, dtype=np.int32),
+        y_pred=np.array(pooled_y_pred, dtype=np.int32),
+        y_prob=np.concatenate(pooled_y_prob, axis=0).astype(np.float32),
+        subj_ids=np.array(pooled_subj_ids, dtype=np.int32),
+        labels=np.array(labels, dtype=np.int32),
+    )
+    print(f"Saved → {npz_path}")
 
 
 if __name__ == "__main__":
