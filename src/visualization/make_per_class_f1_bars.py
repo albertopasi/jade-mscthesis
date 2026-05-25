@@ -8,6 +8,7 @@ Usage:
     uv run python -m src.visualization.make_per_class_f1_bars --task 9-class
     uv run python -m src.visualization.make_per_class_f1_bars --task binary --with-lp
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,17 +17,30 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.visualization._common import (
-    COLOR_FT, COLOR_JADE, COLOR_LP, FT_RUNS, JADE_RUNS, LP_RUNS,
-    LABEL_JADE, LABEL_LP, LABEL_SFT,
-    PROJECT_ROOT, add_title_arg, class_names, load_run, save_fig, setup_style,
+    COLOR_FT,
+    COLOR_JADE,
+    COLOR_LP,
+    FT_RUNS,
+    JADE_RUNS,
+    LABEL_JADE,
+    LABEL_LP,
+    LABEL_SFT,
+    LP_RUNS,
+    PROJECT_ROOT,
+    add_title_arg,
+    class_names,
+    load_run,
+    save_fig,
+    setup_style,
 )
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", choices=["9-class", "binary"], required=True)
-    ap.add_argument("--with-lp", action="store_true",
-                    help="Add LP baseline as a third bar per class.")
+    ap.add_argument(
+        "--with-lp", action="store_true", help="Add LP baseline as a third bar per class."
+    )
     add_title_arg(ap)
     args = ap.parse_args()
 
@@ -63,8 +77,7 @@ def main() -> None:
     fig, ax = plt.subplots(figsize=(max(7.0, 0.9 * n + 3), 4.4))
 
     def _draw(xs, vals, off, color, label=None):
-        ax.bar(xs + off, vals, width, label=label, color=color,
-               edgecolor="black", linewidth=0.4)
+        ax.bar(xs + off, vals, width, label=label, color=color, edgecolor="black", linewidth=0.4)
 
     if args.with_lp:
         _draw(x, f1_lp, offsets[0], COLOR_LP, label=LABEL_LP)
@@ -89,8 +102,16 @@ def main() -> None:
     for xi, d in list(zip(x, delta)) + [(macro_x, macro_delta)]:
         sign = "+" if d >= 0 else ""
         color = "#2ca02c" if d >= 0 else "#d62728"
-        ax.text(xi, ymax + 0.04, f"{sign}{d*100:.1f}", ha="center", va="bottom",
-                fontsize=8, color=color, fontweight="bold")
+        ax.text(
+            xi,
+            ymax + 0.04,
+            f"{sign}{d * 100:.1f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            color=color,
+            fontweight="bold",
+        )
 
     ax.set_xticks(list(x) + [macro_x])
     ax.set_xticklabels(names + ["Macro avg"], rotation=30, ha="right")
@@ -103,8 +124,9 @@ def main() -> None:
     handles, labels = ax.get_legend_handles_labels()
     desired = [LABEL_JADE, LABEL_SFT, LABEL_LP]
     order = [labels.index(d) for d in desired if d in labels]
-    ax.legend([handles[i] for i in order], [labels[i] for i in order],
-              loc="lower right", framealpha=0.9)
+    ax.legend(
+        [handles[i] for i in order], [labels[i] for i in order], loc="lower right", framealpha=0.9
+    )
     ax.grid(axis="y", alpha=0.3, linestyle=":")
 
     fname = "per_class_f1_bars_with_lp.pdf" if args.with_lp else "per_class_f1_bars.pdf"

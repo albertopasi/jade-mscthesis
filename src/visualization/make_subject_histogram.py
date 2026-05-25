@@ -8,6 +8,7 @@ Usage:
     uv run python -m src.visualization.make_subject_histogram --task 9-class
     uv run python -m src.visualization.make_subject_histogram --task binary
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,8 +17,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.visualization._common import (
-    CHANCE, COLOR_BAR_LIGHT, COLOR_CHANCE, COLOR_JADE, COLOR_MEAN, JADE_RUNS,
-    PROJECT_ROOT, add_title_arg, load_run, save_fig, setup_style,
+    CHANCE,
+    COLOR_BAR_LIGHT,
+    COLOR_JADE,
+    COLOR_MEAN,
+    JADE_RUNS,
+    PROJECT_ROOT,
+    add_title_arg,
+    load_run,
+    save_fig,
+    setup_style,
 )
 
 
@@ -39,18 +48,37 @@ def main() -> None:
     chance = CHANCE[args.task]
 
     fig, (ax, ax_box) = plt.subplots(
-        1, 2, figsize=(10, 4),
+        1,
+        2,
+        figsize=(10, 4),
         gridspec_kw={"width_ratios": [12, 1], "wspace": 0.02},
         sharey=True,
     )
 
     x = np.arange(n)
-    ax.bar(x, accs_sorted * 100, width=0.85, color=COLOR_BAR_LIGHT,
-           edgecolor="#666666", linewidth=0.3, label="Per-subject accuracy")
-    ax.axhline(mean * 100, color=COLOR_MEAN, linestyle="--", linewidth=1.2,
-               label=f"Mean = {mean*100:.1f}%")
-    ax.axhline(chance * 100, color="#d62728", linestyle=":", linewidth=1.2,
-               label=f"Chance = {chance*100:.1f}%")
+    ax.bar(
+        x,
+        accs_sorted * 100,
+        width=0.85,
+        color=COLOR_BAR_LIGHT,
+        edgecolor="#666666",
+        linewidth=0.3,
+        label="Per-subject accuracy",
+    )
+    ax.axhline(
+        mean * 100,
+        color=COLOR_MEAN,
+        linestyle="--",
+        linewidth=1.2,
+        label=f"Mean = {mean * 100:.1f}%",
+    )
+    ax.axhline(
+        chance * 100,
+        color="#d62728",
+        linestyle=":",
+        linewidth=1.2,
+        label=f"Chance = {chance * 100:.1f}%",
+    )
 
     ax.set_xlim(-0.5, n - 0.5)
     ax.set_ylim(0, 100)
@@ -61,17 +89,24 @@ def main() -> None:
     ax.legend(loc="upper left", framealpha=0.9)
 
     # Side "averaged accuracy" bar with std error bar
-    ax_box.bar([0], [mean * 100], width=0.6, color=COLOR_JADE,
-               edgecolor="black", linewidth=0.5)
-    ax_box.errorbar([0], [mean * 100], yerr=[std * 100], fmt="none",
-                    ecolor="black", capsize=4, linewidth=1)
+    ax_box.bar([0], [mean * 100], width=0.6, color=COLOR_JADE, edgecolor="black", linewidth=0.5)
+    ax_box.errorbar(
+        [0], [mean * 100], yerr=[std * 100], fmt="none", ecolor="black", capsize=4, linewidth=1
+    )
     ax_box.set_xticks([0])
     ax_box.set_xticklabels(["mean ± std"], rotation=0)
     ax_box.set_xlim(-0.6, 0.6)
     ax_box.tick_params(axis="y", left=False, labelleft=False)
     ax_box.spines["left"].set_visible(False)
 
-    out = PROJECT_ROOT / "src" / "visualization" / f"jade_{args.task}" / "figures" / "subject_histogram.pdf"
+    out = (
+        PROJECT_ROOT
+        / "src"
+        / "visualization"
+        / f"jade_{args.task}"
+        / "figures"
+        / "subject_histogram.pdf"
+    )
     save_fig(fig, out)
 
 

@@ -8,6 +8,7 @@ Usage:
     uv run python -m src.visualization.make_paired_scatter --task 9-class
     uv run python -m src.visualization.make_paired_scatter --task binary --with-lp
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,9 +17,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.visualization._common import (
-    COLOR_JADE, FT_RUNS, JADE_RUNS, LP_RUNS,
-    LABEL_JADE, LABEL_LP, LABEL_SFT,
-    PROJECT_ROOT, add_title_arg, load_run, save_fig, setup_style,
+    COLOR_JADE,
+    FT_RUNS,
+    JADE_RUNS,
+    LABEL_JADE,
+    LABEL_LP,
+    LABEL_SFT,
+    LP_RUNS,
+    PROJECT_ROOT,
+    add_title_arg,
+    load_run,
+    save_fig,
+    setup_style,
 )
 
 
@@ -46,13 +56,23 @@ def _scatter_panel(ax, x: np.ndarray, y: np.ndarray, x_label: str, y_label: str)
         f"Tie: {ties}\n"
         f"mean Δ = {mean_delta:+.2f} pp"
     )
-    ax.text(0.03, 0.97, txt, transform=ax.transAxes, va="top", ha="left",
-            fontsize=9, family="monospace",
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="gray", alpha=0.9))
+    ax.text(
+        0.03,
+        0.97,
+        txt,
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        fontsize=9,
+        family="monospace",
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="gray", alpha=0.9),
+    )
     ax.legend(loc="lower right", framealpha=0.9)
 
 
-def _paired(jade: dict[str, float], other: dict[str, float]) -> tuple[np.ndarray, np.ndarray, list[str]]:
+def _paired(
+    jade: dict[str, float], other: dict[str, float]
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
     common = sorted(set(jade) & set(other), key=int)
     if not common:
         raise SystemExit("No overlapping subjects between runs.")
@@ -64,8 +84,9 @@ def _paired(jade: dict[str, float], other: dict[str, float]) -> tuple[np.ndarray
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", choices=["9-class", "binary"], required=True)
-    ap.add_argument("--with-lp", action="store_true",
-                    help="Also produce a 2-panel figure including JADE-vs-LP.")
+    ap.add_argument(
+        "--with-lp", action="store_true", help="Also produce a 2-panel figure including JADE-vs-LP."
+    )
     add_title_arg(ap)
     args = ap.parse_args()
 
@@ -81,7 +102,14 @@ def main() -> None:
         _scatter_panel(ax, x, y, LABEL_SFT, LABEL_JADE)
         if args.title:
             ax.set_title(f"Paired per-subject comparison ({args.task})")
-        out = PROJECT_ROOT / "src" / "visualization" / f"jade_{args.task}" / "figures" / "paired_subject_scatter.pdf"
+        out = (
+            PROJECT_ROOT
+            / "src"
+            / "visualization"
+            / f"jade_{args.task}"
+            / "figures"
+            / "paired_subject_scatter.pdf"
+        )
         save_fig(fig, out)
         return
 
@@ -99,7 +127,14 @@ def main() -> None:
         fig.tight_layout(rect=[0, 0, 1, 0.96])
     else:
         fig.tight_layout()
-    out = PROJECT_ROOT / "src" / "visualization" / f"jade_{args.task}" / "figures" / "paired_subject_scatter_with_lp.pdf"
+    out = (
+        PROJECT_ROOT
+        / "src"
+        / "visualization"
+        / f"jade_{args.task}"
+        / "figures"
+        / "paired_subject_scatter_with_lp.pdf"
+    )
     save_fig(fig, out)
 
 

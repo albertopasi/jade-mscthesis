@@ -6,11 +6,11 @@ Usage:
     uv run python -m src.visualization.make_per_class_table --task 9-class
     uv run python -m src.visualization.make_per_class_table --task binary
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
-from pathlib import Path
 
 from src.visualization._common import JADE_RUNS, PROJECT_ROOT, class_names, load_run
 
@@ -28,20 +28,24 @@ def main() -> None:
 
     rows = []
     for i, name in enumerate(names):
-        rows.append({
-            "class": name,
-            "precision": pc["precision"][i],
-            "recall": pc["recall"][i],
-            "f1": pc["f1"][i],
-            "support": pc["support"][i],
-        })
-    rows.append({
-        "class": "Macro avg",
-        "precision": macro["precision"],
-        "recall": macro["recall"],
-        "f1": macro["f1"],
-        "support": sum(pc["support"]),
-    })
+        rows.append(
+            {
+                "class": name,
+                "precision": pc["precision"][i],
+                "recall": pc["recall"][i],
+                "f1": pc["f1"][i],
+                "support": pc["support"][i],
+            }
+        )
+    rows.append(
+        {
+            "class": "Macro avg",
+            "precision": macro["precision"],
+            "recall": macro["recall"],
+            "f1": macro["f1"],
+            "support": sum(pc["support"]),
+        }
+    )
 
     out_dir = PROJECT_ROOT / "src" / "visualization" / f"jade_{args.task}" / "figures"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -81,8 +85,10 @@ def main() -> None:
     print(f"\n  JADE per-class metrics ({args.task}):")
     print(f"  {'class':<14}  {'P':>6}  {'R':>6}  {'F1':>6}  {'support':>8}")
     for r in rows:
-        print(f"  {r['class']:<14}  {r['precision']:>6.3f}  "
-              f"{r['recall']:>6.3f}  {r['f1']:>6.3f}  {r['support']:>8}")
+        print(
+            f"  {r['class']:<14}  {r['precision']:>6.3f}  "
+            f"{r['recall']:>6.3f}  {r['f1']:>6.3f}  {r['support']:>8}"
+        )
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ Usage:
     uv run python -m src.visualization.make_all --title      # with titles
     uv run python -m src.visualization.make_all --task 9-class
 """
+
 from __future__ import annotations
 
 import argparse

@@ -27,19 +27,35 @@ from sklearn.metrics import auc, roc_curve
 
 # Emotion class names matching the 0..8 labels in the project.
 CLASS_NAMES_9 = [
-    "Anger", "Disgust", "Fear", "Sadness", "Neutral",
-    "Amusement", "Inspiration", "Joy", "Tenderness",
+    "Anger",
+    "Disgust",
+    "Fear",
+    "Sadness",
+    "Neutral",
+    "Amusement",
+    "Inspiration",
+    "Joy",
+    "Tenderness",
 ]
 CLASS_NAMES_2 = ["Negative", "Positive"]
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--stem", required=True,
-                   help="Filename stem (without extension). Files <stem>.json and <stem>.npz must exist.")
-    p.add_argument("--dir", type=Path, default=Path.cwd(),
-                   help="Directory containing <stem>.json/.npz and where plots are written. "
-                        "Default: current working directory.")
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "--stem",
+        required=True,
+        help="Filename stem (without extension). Files <stem>.json and <stem>.npz must exist.",
+    )
+    p.add_argument(
+        "--dir",
+        type=Path,
+        default=Path.cwd(),
+        help="Directory containing <stem>.json/.npz and where plots are written. "
+        "Default: current working directory.",
+    )
     return p.parse_args()
 
 
@@ -71,15 +87,20 @@ def plot_roc(y_true: np.ndarray, y_prob: np.ndarray, labels: np.ndarray, out_pat
         aucs[i] = roc_auc
         tpr_interp[i] = np.interp(fpr_grid, fpr, tpr)
         tpr_interp[i, 0] = 0.0
-        ax.plot(fpr, tpr, color=cmap(i), lw=1.5,
-                label=f"{names[i]} (AUC={roc_auc:.3f})")
+        ax.plot(fpr, tpr, color=cmap(i), lw=1.5, label=f"{names[i]} (AUC={roc_auc:.3f})")
 
     # Macro-average across classes
     mean_tpr = tpr_interp.mean(axis=0)
     mean_tpr[-1] = 1.0
     macro_auc = auc(fpr_grid, mean_tpr)
-    ax.plot(fpr_grid, mean_tpr, color="black", lw=2.5, linestyle="--",
-            label=f"Macro avg (AUC={macro_auc:.3f})")
+    ax.plot(
+        fpr_grid,
+        mean_tpr,
+        color="black",
+        lw=2.5,
+        linestyle="--",
+        label=f"Macro avg (AUC={macro_auc:.3f})",
+    )
 
     ax.plot([0, 1], [0, 1], color="gray", lw=1, linestyle=":")
     ax.set_xlim(0, 1)
@@ -113,10 +134,15 @@ def plot_confmat(cm: np.ndarray, labels: list[int], out_path: Path) -> None:
     ax.set_title("Confusion matrix (row-normalized)")
     for i in range(n_classes):
         for j in range(n_classes):
-            ax.text(j, i, f"{cm_norm[i, j]:.2f}",
-                    ha="center", va="center",
-                    color="white" if cm_norm[i, j] > 0.5 else "black",
-                    fontsize=8)
+            ax.text(
+                j,
+                i,
+                f"{cm_norm[i, j]:.2f}",
+                ha="center",
+                va="center",
+                color="white" if cm_norm[i, j] > 0.5 else "black",
+                fontsize=8,
+            )
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
@@ -136,14 +162,16 @@ def plot_per_class(per_class: dict, labels: list[int], out_path: Path) -> None:
     w = 0.27
     fig, ax = plt.subplots(figsize=(9, 4.5))
     ax.bar(x - w, precision, w, label="Precision", color="#4C78A8")
-    ax.bar(x,     recall,    w, label="Recall",    color="#F58518")
-    ax.bar(x + w, f1,        w, label="F1",        color="#54A24B")
+    ax.bar(x, recall, w, label="Recall", color="#F58518")
+    ax.bar(x + w, f1, w, label="F1", color="#54A24B")
     ax.set_xticks(x)
     ax.set_xticklabels(names, rotation=30, ha="right")
     ax.set_ylim(0, 1)
     ax.set_ylabel("Score")
     ax.set_title("Per-class precision / recall / F1")
-    ax.axhline(1 / n_classes, color="gray", lw=1, linestyle=":", label=f"chance ({1/n_classes:.2f})")
+    ax.axhline(
+        1 / n_classes, color="gray", lw=1, linestyle=":", label=f"chance ({1 / n_classes:.2f})"
+    )
     ax.legend(loc="upper right", fontsize=9)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
@@ -160,8 +188,13 @@ def plot_per_subject(per_subject_acc: dict, out_path: Path) -> None:
 
     fig, ax = plt.subplots(figsize=(7, 4.5))
     ax.hist(accs, bins=20, color="#4C78A8", edgecolor="white")
-    ax.axvline(mean, color="black", lw=2, linestyle="--",
-               label=f"mean={mean:.3f}, std={std:.3f}, N={len(accs)}")
+    ax.axvline(
+        mean,
+        color="black",
+        lw=2,
+        linestyle="--",
+        label=f"mean={mean:.3f}, std={std:.3f}, N={len(accs)}",
+    )
     ax.set_xlabel("Per-subject accuracy")
     ax.set_ylabel("Number of subjects")
     ax.set_title("Distribution of per-subject accuracies")

@@ -34,7 +34,6 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
-from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -59,29 +58,49 @@ N_CLASSES = {"9-class": 9, "binary": 2}
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("--approach", choices=["lp", "ft", "jade"], required=True)
     p.add_argument("--task", choices=["9-class", "binary"], required=True)
     p.add_argument("--dataset", choices=["faced", "thu-ep"], default="faced")
-    p.add_argument("--ckpt-root", type=Path, required=True,
-                   help="Directory containing the per-fold checkpoint dirs.")
-    p.add_argument("--run-stem", type=str, required=True,
-                   help="Run-name stem; per-fold dirs are <stem>_fold_{1..10}.")
+    p.add_argument(
+        "--ckpt-root",
+        type=Path,
+        required=True,
+        help="Directory containing the per-fold checkpoint dirs.",
+    )
+    p.add_argument(
+        "--run-stem",
+        type=str,
+        required=True,
+        help="Run-name stem; per-fold dirs are <stem>_fold_{1..10}.",
+    )
     p.add_argument("--window", type=int, default=10, help="Window size in seconds (default 10).")
     p.add_argument("--stride", type=int, default=10, help="Stride in seconds (default 10).")
     p.add_argument("--pooling", choices=["no", "last", "last_avg"], default="no")
     p.add_argument("--batch-size", type=int, default=64)
-    p.add_argument("--reve-base", type=Path,
-                   default=Path("models/reve_pretrained_original/reve-base"))
-    p.add_argument("--reve-pos", type=Path,
-                   default=Path("models/reve_pretrained_original/reve-positions"))
+    p.add_argument(
+        "--reve-base", type=Path, default=Path("models/reve_pretrained_original/reve-base")
+    )
+    p.add_argument(
+        "--reve-pos", type=Path, default=Path("models/reve_pretrained_original/reve-positions")
+    )
     p.add_argument("--n-folds", type=int, default=10)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     # JADE/FT extras (only used when building the model)
-    p.add_argument("--lora-rank", type=int, default=16,
-                   help="LoRA rank (FT/JADE — only matters when reading non-fullft checkpoints).")
-    p.add_argument("--out-path", type=Path, default=None,
-                   help="Output JSON path. Default: main-results/<approach>_<task>/<run-stem>.json")
+    p.add_argument(
+        "--lora-rank",
+        type=int,
+        default=16,
+        help="LoRA rank (FT/JADE — only matters when reading non-fullft checkpoints).",
+    )
+    p.add_argument(
+        "--out-path",
+        type=Path,
+        default=None,
+        help="Output JSON path. Default: main-results/<approach>_<task>/<run-stem>.json",
+    )
     return p.parse_args()
 
 
@@ -99,21 +118,33 @@ def build_model(
     n_channels = N_CHANNELS[dataset]
     if approach == "lp":
         return ReveClassifierLP(
-            reve_model=reve_model, pos_tensor=pos_tensor,
-            n_classes=n_classes, n_channels=n_channels,
-            window_size=window_size, pooling=pooling, dropout=0.0,
+            reve_model=reve_model,
+            pos_tensor=pos_tensor,
+            n_classes=n_classes,
+            n_channels=n_channels,
+            window_size=window_size,
+            pooling=pooling,
+            dropout=0.0,
         )
     if approach == "ft":
         return ReveClassifierFT(
-            reve_model=reve_model, pos_tensor=pos_tensor,
-            n_classes=n_classes, n_channels=n_channels,
-            window_size=window_size, pooling=pooling, dropout=0.0,
+            reve_model=reve_model,
+            pos_tensor=pos_tensor,
+            n_classes=n_classes,
+            n_channels=n_channels,
+            window_size=window_size,
+            pooling=pooling,
+            dropout=0.0,
         )
     if approach == "jade":
         return ReveClassifierJADE(
-            reve_model=reve_model, pos_tensor=pos_tensor,
-            n_classes=n_classes, n_channels=n_channels,
-            window_size=window_size, pooling=pooling, dropout=0.0,
+            reve_model=reve_model,
+            pos_tensor=pos_tensor,
+            n_classes=n_classes,
+            n_channels=n_channels,
+            window_size=window_size,
+            pooling=pooling,
+            dropout=0.0,
         )
     raise ValueError(approach)
 
@@ -174,7 +205,9 @@ def infer_one_fold(
     Critical: shuffle=False + num_workers=0 so that batch order matches
     `val_ds.index`, letting us recover the subject_id per window via index lookup.
     """
-    loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
+    loader = DataLoader(
+        val_ds, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True
+    )
     model.eval()
     y_true_all, y_pred_all, y_prob_all = [], [], []
     for eeg, label in loader:
@@ -222,7 +255,7 @@ def main() -> None:
     window_size = args.window * SAMPLING_RATE
     stride = args.stride * SAMPLING_RATE
 
-    print(f"\n=== Subject-wise inference ===")
+    print("\n=== Subject-wise inference ===")
     print(f"Approach: {args.approach}  |  Task: {args.task}  |  Dataset: {args.dataset}")
     print(f"Ckpt root: {args.ckpt_root}")
     print(f"Run stem:  {args.run_stem}")
@@ -233,8 +266,10 @@ def main() -> None:
     # get loaded on top per-fold for FT/JADE)
     channel_names = get_channel_names(args.dataset)
     reve_model, pos_tensor = load_reve_and_positions(
-        channel_names, device=args.device,
-        reve_model_path=args.reve_base, reve_pos_path=args.reve_pos,
+        channel_names,
+        device=args.device,
+        reve_model_path=args.reve_base,
+        reve_pos_path=args.reve_pos,
     )
 
     all_subjects = get_all_subjects(args.dataset)
@@ -267,24 +302,37 @@ def main() -> None:
 
         # Build model fresh per fold + load weights
         model = build_model(
-            args.approach, args.task, args.dataset, args.pooling,
-            window_size, reve_model, pos_tensor,
+            args.approach,
+            args.task,
+            args.dataset,
+            args.pooling,
+            window_size,
+            reve_model,
+            pos_tensor,
         )
         load_weights(model, ckpt_dir, args.approach)
         model.to(args.device)
 
         out = infer_one_fold(model, val_ds, val_subjects, args.batch_size, args.device)
-        fold_acc_macro = float(np.mean(list(out["per_subject_acc"].values()))) if out["per_subject_acc"] else float("nan")
-        print(f"[fold {fold_idx}] window_acc={out['fold_acc_window']:.4f}  "
-              f"macro_subject_acc={fold_acc_macro:.4f}  n_subjects={len(out['per_subject_acc'])}")
+        fold_acc_macro = (
+            float(np.mean(list(out["per_subject_acc"].values())))
+            if out["per_subject_acc"]
+            else float("nan")
+        )
+        print(
+            f"[fold {fold_idx}] window_acc={out['fold_acc_window']:.4f}  "
+            f"macro_subject_acc={fold_acc_macro:.4f}  n_subjects={len(out['per_subject_acc'])}"
+        )
 
-        fold_results.append({
-            "fold": fold_idx,
-            "val_subjects": val_subjects,
-            "window_acc": out["fold_acc_window"],
-            "macro_subject_acc": fold_acc_macro,
-            "per_subject_acc": out["per_subject_acc"],
-        })
+        fold_results.append(
+            {
+                "fold": fold_idx,
+                "val_subjects": val_subjects,
+                "window_acc": out["fold_acc_window"],
+                "macro_subject_acc": fold_acc_macro,
+                "per_subject_acc": out["per_subject_acc"],
+            }
+        )
 
         for sid, acc in out["per_subject_acc"].items():
             if sid in pooled_per_subject_acc:
@@ -320,10 +368,12 @@ def main() -> None:
         pooled_y_true, pooled_y_pred, labels=labels, average="macro", zero_division=0
     )
 
-    print(f"\n  Per-class:")
+    print("\n  Per-class:")
     print(f"  {'class':>6}  {'P':>8}  {'R':>8}  {'F1':>8}  {'support':>8}")
     for i, lbl in enumerate(labels):
-        print(f"  {lbl:>6}  {precision[i]:>8.4f}  {recall[i]:>8.4f}  {f1[i]:>8.4f}  {int(support[i]):>8d}")
+        print(
+            f"  {lbl:>6}  {precision[i]:>8.4f}  {recall[i]:>8.4f}  {f1[i]:>8.4f}  {int(support[i]):>8d}"
+        )
     print(f"  {'macro':>6}  {macro_p:>8.4f}  {macro_r:>8.4f}  {macro_f1:>8.4f}")
 
     # AUROC (one-vs-rest, pooled across all windows)
@@ -340,12 +390,17 @@ def main() -> None:
     if n_classes == 2:
         macro_auroc = float(roc_auc_score(pooled_y_true_arr, pooled_y_prob_arr[:, 1]))
     else:
-        macro_auroc = float(roc_auc_score(
-            pooled_y_true_arr, pooled_y_prob_arr,
-            multi_class="ovr", average="macro", labels=labels,
-        ))
+        macro_auroc = float(
+            roc_auc_score(
+                pooled_y_true_arr,
+                pooled_y_prob_arr,
+                multi_class="ovr",
+                average="macro",
+                labels=labels,
+            )
+        )
     print(f"\n  AUROC (macro, one-vs-rest): {macro_auroc:.4f}")
-    print(f"  AUROC per-class: " + ", ".join(f"{a:.3f}" for a in auroc_per_class))
+    print("  AUROC per-class: " + ", ".join(f"{a:.3f}" for a in auroc_per_class))
 
     # ── Write JSON ───────────────────────────────────────────────────────────
     out_dir = project_root / "main-results" / f"{args.approach}_{args.task}"
@@ -371,23 +426,27 @@ def main() -> None:
             "confusion_matrix": cm.tolist(),
             "per_class": {
                 "precision": [round(float(x), 4) for x in precision],
-                "recall":    [round(float(x), 4) for x in recall],
-                "f1":        [round(float(x), 4) for x in f1],
-                "support":   [int(x) for x in support],
+                "recall": [round(float(x), 4) for x in recall],
+                "f1": [round(float(x), 4) for x in f1],
+                "support": [int(x) for x in support],
             },
             "macro": {
                 "precision": round(float(macro_p), 4),
-                "recall":    round(float(macro_r), 4),
-                "f1":        round(float(macro_f1), 4),
-                "auroc":     round(macro_auroc, 4),
+                "recall": round(float(macro_r), 4),
+                "f1": round(float(macro_f1), 4),
+                "auroc": round(macro_auroc, 4),
             },
             "auroc_per_class": [round(a, 4) for a in auroc_per_class],
         },
         "per_subject_acc": {str(sid): acc for sid, acc in pooled_per_subject_acc.items()},
         "per_subject_support": {str(sid): n for sid, n in pooled_per_subject_support.items()},
         "folds": [
-            {"fold": r["fold"], "val_subjects": r["val_subjects"],
-             "window_acc": r["window_acc"], "macro_subject_acc": r["macro_subject_acc"]}
+            {
+                "fold": r["fold"],
+                "val_subjects": r["val_subjects"],
+                "window_acc": r["window_acc"],
+                "macro_subject_acc": r["macro_subject_acc"],
+            }
             for r in fold_results
         ],
     }

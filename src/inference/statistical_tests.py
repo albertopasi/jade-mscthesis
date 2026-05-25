@@ -24,6 +24,7 @@ Writes a single markdown document at docs/statistical_tests.md.
 Usage:
     uv run python -m src.inference.statistical_tests
 """
+
 from __future__ import annotations
 
 import json
@@ -38,12 +39,18 @@ RESULTS_ROOT = PROJECT_ROOT / "main-results"
 OUT_PATH = PROJECT_ROOT / "docs" / "statistical_tests.md"
 
 RUNS: dict[tuple[str, str], str] = {
-    ("lp",   "9-class"): "lp_faced_v2_9-class_w10s10_pool_no_official_nomixup",
-    ("lp",   "binary"):  "lp_faced_v2_binary_w10s10_pool_no_official_nomixup",
-    ("ft",   "9-class"): "ft_faced_9-class_w10s10_pool_no_r16_b256_lr0.0004_nomixup_fullft",
-    ("ft",   "binary"):  "ft_faced_binary_w10s10_pool_no_r16_nomixup_fullft",
-    ("jade", "9-class"): "jade_faced_9-class_w10s10_pool_no_r16_a0.3_t0.2_context_b256_lr0.0004_fullft",
-    ("jade", "binary"):  "jade_faced_binary_w10s10_pool_no_r16_a0.2_t0.05_context_b128_lr0.0001_fullft",
+    ("lp", "9-class"): "lp_faced_v2_9-class_w10s10_pool_no_official_nomixup",
+    ("lp", "binary"): "lp_faced_v2_binary_w10s10_pool_no_official_nomixup",
+    ("ft", "9-class"): "ft_faced_9-class_w10s10_pool_no_r16_b256_lr0.0004_nomixup_fullft",
+    ("ft", "binary"): "ft_faced_binary_w10s10_pool_no_r16_nomixup_fullft",
+    (
+        "jade",
+        "9-class",
+    ): "jade_faced_9-class_w10s10_pool_no_r16_a0.3_t0.2_context_b256_lr0.0004_fullft",
+    (
+        "jade",
+        "binary",
+    ): "jade_faced_binary_w10s10_pool_no_r16_a0.2_t0.05_context_b128_lr0.0001_fullft",
 }
 LABELS = {"lp": "LP", "ft": "SFT", "jade": "JADE"}
 TASKS = ["9-class", "binary"]
@@ -58,7 +65,9 @@ def load_per_subject(approach: str, task: str) -> dict[int, float]:
     return {int(k): float(v) for k, v in data["per_subject_acc"].items()}
 
 
-def aligned_pair(a: dict[int, float], b: dict[int, float]) -> tuple[np.ndarray, np.ndarray, list[int]]:
+def aligned_pair(
+    a: dict[int, float], b: dict[int, float]
+) -> tuple[np.ndarray, np.ndarray, list[int]]:
     common = sorted(set(a) & set(b))
     if not common:
         raise RuntimeError("No overlapping subjects between conditions.")
@@ -82,7 +91,9 @@ def holm_bonferroni(pvals: list[float]) -> list[float]:
     return adjusted.tolist()
 
 
-def bca_bootstrap_ci(x: np.ndarray, seed: int, n_boot: int, alpha: float = 0.05) -> tuple[float, float]:
+def bca_bootstrap_ci(
+    x: np.ndarray, seed: int, n_boot: int, alpha: float = 0.05
+) -> tuple[float, float]:
     """BCa bootstrap CI on the mean of x via scipy.stats.bootstrap.
 
     BCa = bias-corrected and accelerated. It adjusts for both bias in the
@@ -91,13 +102,20 @@ def bca_bootstrap_ci(x: np.ndarray, seed: int, n_boot: int, alpha: float = 0.05)
     """
     rng = np.random.default_rng(seed)
     res = stats.bootstrap(
-        (x,), np.mean, n_resamples=n_boot, confidence_level=1 - alpha,
-        method="BCa", random_state=rng, vectorized=False,
+        (x,),
+        np.mean,
+        n_resamples=n_boot,
+        confidence_level=1 - alpha,
+        method="BCa",
+        random_state=rng,
+        vectorized=False,
     )
     return float(res.confidence_interval.low), float(res.confidence_interval.high)
 
 
-def percentile_bootstrap_ci(d: np.ndarray, seed: int, n_boot: int, alpha: float = 0.05) -> tuple[float, float]:
+def percentile_bootstrap_ci(
+    d: np.ndarray, seed: int, n_boot: int, alpha: float = 0.05
+) -> tuple[float, float]:
     """Plain percentile bootstrap CI on the mean of d.
 
     Used as a non-parametric alternative to the t-based CI on the paired
@@ -107,7 +125,9 @@ def percentile_bootstrap_ci(d: np.ndarray, seed: int, n_boot: int, alpha: float 
     rng = np.random.default_rng(seed)
     idx = rng.integers(0, len(d), size=(n_boot, len(d)))
     means = d[idx].mean(axis=1)
-    return float(np.percentile(means, 100 * alpha / 2)), float(np.percentile(means, 100 * (1 - alpha / 2)))
+    return float(np.percentile(means, 100 * alpha / 2)), float(
+        np.percentile(means, 100 * (1 - alpha / 2))
+    )
 
 
 @dataclass
@@ -145,7 +165,9 @@ class PairedResult:
     rank_biserial: float
 
 
-def run_paired(a_label: str, a_vals: np.ndarray, b_label: str, b_vals: np.ndarray, task: str, seed: int) -> PairedResult:
+def run_paired(
+    a_label: str, a_vals: np.ndarray, b_label: str, b_vals: np.ndarray, task: str, seed: int
+) -> PairedResult:
     diff = a_vals - b_vals
     n = len(diff)
     nonzero = diff[diff != 0]
@@ -197,16 +219,33 @@ def run_paired(a_label: str, a_vals: np.ndarray, b_label: str, b_vals: np.ndarra
         rb = float("nan")
 
     return PairedResult(
-        label_a=a_label, label_b=b_label, task=task, n=n,
-        n_nonzero=n_nonzero, n_wins=n_wins, n_losses=n_losses, n_ties=n_ties,
-        mean_a=float(a_vals.mean()), mean_b=float(b_vals.mean()),
-        mean_diff=mean_diff, median_diff=median_diff, std_diff=std_diff,
-        t_ci_lo=t_ci_lo, t_ci_hi=t_ci_hi,
-        boot_ci_lo=boot_ci_lo, boot_ci_hi=boot_ci_hi,
-        t_stat=t_stat, t_pval=t_pval,
-        w_stat=w_stat, w_pval=w_pval, sign_pval=sign_pval,
-        diff_skew=diff_skew, diff_kurtosis_excess=diff_kurt, shapiro_pval=shapiro_pval,
-        cohen_d=cohen_d, rank_biserial=rb,
+        label_a=a_label,
+        label_b=b_label,
+        task=task,
+        n=n,
+        n_nonzero=n_nonzero,
+        n_wins=n_wins,
+        n_losses=n_losses,
+        n_ties=n_ties,
+        mean_a=float(a_vals.mean()),
+        mean_b=float(b_vals.mean()),
+        mean_diff=mean_diff,
+        median_diff=median_diff,
+        std_diff=std_diff,
+        t_ci_lo=t_ci_lo,
+        t_ci_hi=t_ci_hi,
+        boot_ci_lo=boot_ci_lo,
+        boot_ci_hi=boot_ci_hi,
+        t_stat=t_stat,
+        t_pval=t_pval,
+        w_stat=w_stat,
+        w_pval=w_pval,
+        sign_pval=sign_pval,
+        diff_skew=diff_skew,
+        diff_kurtosis_excess=diff_kurt,
+        shapiro_pval=shapiro_pval,
+        cohen_d=cohen_d,
+        rank_biserial=rb,
     )
 
 
@@ -226,11 +265,17 @@ def main() -> None:
     for (approach, task), _ in RUNS.items():
         accs = np.array(list(load_per_subject(approach, task).values()), dtype=float)
         lo, hi = bca_bootstrap_ci(accs, seed=BOOTSTRAP_SEED, n_boot=BOOTSTRAP_N)
-        bootstrap_rows.append({
-            "method": LABELS[approach], "task": task, "n": len(accs),
-            "mean": float(accs.mean()), "std": float(accs.std(ddof=1)),
-            "ci_lo": lo, "ci_hi": hi,
-        })
+        bootstrap_rows.append(
+            {
+                "method": LABELS[approach],
+                "task": task,
+                "n": len(accs),
+                "mean": float(accs.mean()),
+                "std": float(accs.std(ddof=1)),
+                "ci_lo": lo,
+                "ci_hi": hi,
+            }
+        )
 
     # ── Paired tests ───────────────────────────────────────────────────────
     paired_results: list[PairedResult] = []
@@ -242,10 +287,16 @@ def main() -> None:
     for i, task in enumerate(TASKS):
         for j, (baseline_key, baseline_dict) in enumerate([("SFT", sft[task]), ("LP", lp[task])]):
             a, b, _ = aligned_pair(jade[task], baseline_dict)
-            paired_results.append(run_paired(
-                "JADE", a, baseline_key, b, task,
-                seed=BOOTSTRAP_SEED + 100 * (2 * i + j),
-            ))
+            paired_results.append(
+                run_paired(
+                    "JADE",
+                    a,
+                    baseline_key,
+                    b,
+                    task,
+                    seed=BOOTSTRAP_SEED + 100 * (2 * i + j),
+                )
+            )
 
     # Holm-Bonferroni on the 4 t and 4 Wilcoxon p-values.
     t_adj = holm_bonferroni([r.t_pval for r in paired_results])
@@ -283,7 +334,7 @@ def main() -> None:
     L.append("the held-out fold containing them.")
     L.append("")
     L.append("**Intuitively.** *\"How well does the model do on this person's brain")
-    L.append("data when it has never seen them during training?\"* This is the central")
+    L.append('data when it has never seen them during training?"* This is the central')
     L.append("question for cross-subject EEG.")
     L.append("")
     L.append("All statistics in this document operate on these per-subject vectors. The")
@@ -304,7 +355,7 @@ def main() -> None:
     L.append("Formula: `std(a) = sqrt( (1/(N-1)) · Σ (a_i − mean(a))² )` (sample std,")
     L.append("denominator `N−1`).")
     L.append("")
-    L.append("**Intuitively.** *\"How much do subjects vary?\"* A large std means some")
+    L.append('**Intuitively.** *"How much do subjects vary?"* A large std means some')
     L.append("subjects are much easier than others — the well-known **inter-subject")
     L.append("variability** of EEG.")
     L.append("")
@@ -337,14 +388,14 @@ def main() -> None:
     L.append("   resamples below the observed statistic; acceleration estimated via")
     L.append("   jackknife). The corrected percentiles form the 95 % CI.")
     L.append("")
-    L.append("**Intuitively.** *\"If I were to repeat this entire study with a different")
+    L.append('**Intuitively.** *"If I were to repeat this entire study with a different')
     L.append("set of 123 subjects drawn from the same population, where would the mean")
-    L.append("accuracy land 95 % of the time?\"*")
+    L.append('accuracy land 95 % of the time?"*')
     L.append("")
 
     L.append("### 0.5 Paired difference vector")
     L.append("")
-    L.append("For each comparison \"method A vs method B\" on a given task we form the")
+    L.append('For each comparison "method A vs method B" on a given task we form the')
     L.append("**paired difference** vector `d_i = a_i − b_i` (subject *i*'s accuracy")
     L.append("under A minus their accuracy under B). Because both methods are evaluated")
     L.append("on the *same* subjects, the difference removes the subject-level")
@@ -362,8 +413,8 @@ def main() -> None:
 
     L.append("### 0.6 Paired t-test (parametric)")
     L.append("")
-    L.append("**What it tests.** `H₀: mean(d) = 0` — \"the two methods are equally good")
-    L.append("on average\". Two-sided alternative.")
+    L.append('**What it tests.** `H₀: mean(d) = 0` — "the two methods are equally good')
+    L.append('on average". Two-sided alternative.')
     L.append("")
     L.append("**Formula.** `t = mean(d) / (std(d) / sqrt(N))`. The denominator is the")
     L.append("standard error of the mean of the differences. The *p*-value is looked up")
@@ -390,7 +441,7 @@ def main() -> None:
     L.append("")
     L.append("**Procedure.**")
     L.append("")
-    L.append("1. Drop pairs where `d_i = 0` exactly (the `\"wilcox\"` zero-method, the")
+    L.append('1. Drop pairs where `d_i = 0` exactly (the `"wilcox"` zero-method, the')
     L.append("   standard default in scipy and most stats packages).")
     L.append("2. Rank the absolute differences `|d_i|` from smallest (rank 1) to largest.")
     L.append("3. Sum the ranks of pairs where `d_i > 0` (call this `W+`) and where")
@@ -399,9 +450,9 @@ def main() -> None:
     L.append("   statistic is `min(W+, W−)`; the *p*-value comes from its null")
     L.append("   distribution (computed exactly for small N, asymptotically here).")
     L.append("")
-    L.append("**Intuitively.** *\"Setting aside the exact size of each improvement, is")
+    L.append('**Intuitively.** *"Setting aside the exact size of each improvement, is')
     L.append("there a clear pattern of A winning more often (and by larger ranked")
-    L.append("amounts) than B?\"*")
+    L.append('amounts) than B?"*')
     L.append("")
     L.append("**Why it is primary.** It makes **no normality assumption** — only ranks")
     L.append("are used, so heavy tails, outliers and modest non-normality do not break")
@@ -416,23 +467,23 @@ def main() -> None:
     L.append("loses with equal probability. The test statistic is the number of wins")
     L.append("among non-zero pairs; under `H₀` this follows `Binomial(n_nonzero, 0.5)`.")
     L.append("")
-    L.append("**Intuitively.** *\"Forgetting both the *size* of the gain and its *rank*,")
-    L.append("does JADE simply win on more subjects than it loses?\"* The crudest")
+    L.append('**Intuitively.** *"Forgetting both the *size* of the gain and its *rank*,')
+    L.append('does JADE simply win on more subjects than it loses?"* The crudest')
     L.append("possible paired test — it discards all magnitude information.")
     L.append("")
     L.append("**Role in this report.** Convergent-evidence check. When the t, Wilcoxon")
     L.append("and sign tests all agree, the conclusion is exceptionally robust because")
     L.append("they use very different aspects of the data (mean vs ranks vs counts).")
     L.append("When the sign test disagrees with the others, magnitude information is")
-    L.append("doing meaningful work and we cannot reduce the question to \"who wins more")
-    L.append("often\".")
+    L.append('doing meaningful work and we cannot reduce the question to "who wins more')
+    L.append('often".')
     L.append("")
 
     L.append("### 0.9 Effect sizes — Cohen's *d* and rank-biserial *r*")
     L.append("")
     L.append("**Why these matter.** With N = 123 the tests have high power and can")
-    L.append("declare even tiny differences \"significant\". Effect sizes answer a")
-    L.append("different question: not *\"is it real?\"* but *\"is it big?\"*.")
+    L.append('declare even tiny differences "significant". Effect sizes answer a')
+    L.append('different question: not *"is it real?"* but *"is it big?"*.')
     L.append("")
     L.append("**Cohen's *d* (paired).** Formula: `d = mean(d) / std(d)`. Unit-free.")
     L.append("Conventional cut-offs (Cohen, 1988): `0.2` small, `0.5` medium, `0.8`")
@@ -485,14 +536,14 @@ def main() -> None:
     L.append("subjects. With only 10 folds, however, a block bootstrap is high-")
     L.append("variance and produces CIs much wider than the data warrant. We therefore")
     L.append("report the standard subject-level bootstrap and acknowledge that the")
-    L.append("\"effective sample size\" is slightly below 123. This is consistent with")
+    L.append('"effective sample size" is slightly below 123. This is consistent with')
     L.append("standard practice in cross-subject EEG papers.")
     L.append("")
     L.append("**Zero-difference pairs.** Subjects whose accuracy under method A")
     L.append("happens to exactly equal their accuracy under method B (e.g. both classify")
     L.append("the same windows correctly) produce `d_i = 0`. The Wilcoxon test here")
-    L.append("uses the `\"wilcox\"` mode, which **drops** such pairs. An alternative")
-    L.append("(`\"pratt\"` mode) keeps them and is slightly more conservative; we do not")
+    L.append('uses the `"wilcox"` mode, which **drops** such pairs. An alternative')
+    L.append('(`"pratt"` mode) keeps them and is slightly more conservative; we do not')
     L.append("report it because it does not change the qualitative conclusions on this")
     L.append("dataset. The sign test naturally excludes zeros (the binomial is computed")
     L.append("over non-zero pairs only).")
@@ -516,8 +567,8 @@ def main() -> None:
     for r in bootstrap_rows:
         L.append(
             f"| {r['method']:<6} | {r['task']:<7} | {r['n']:>3} | "
-            f"{r['mean']*100:>6.2f} %  | {r['std']*100:>5.2f} %    | "
-            f"{r['ci_lo']*100:>5.2f} % – {r['ci_hi']*100:>5.2f} %         |"
+            f"{r['mean'] * 100:>6.2f} %  | {r['std'] * 100:>5.2f} %    | "
+            f"{r['ci_lo'] * 100:>5.2f} % – {r['ci_hi'] * 100:>5.2f} %         |"
         )
     L.append("")
 
@@ -530,14 +581,18 @@ def main() -> None:
     L.append("Δ are shown; agreement between them is a sanity check on the t-test's")
     L.append("normality assumption.")
     L.append("")
-    L.append("| Comparison | Task | Mean Δ (pp) | Median Δ (pp) | CI 95 % t (pp) | CI 95 % bootstrap (pp) | Cohen's d | Rank-bis. r | Wins / Losses / Ties | Wilcoxon W | p (Wilcoxon) | Holm p (W) | t | p (t-test) | Holm p (t) | Sign-test p | Shapiro p (normality) |")
-    L.append("|------------|------|-------------|---------------|----------------|------------------------|-----------|-------------|----------------------|------------|--------------|------------|---|------------|------------|-------------|-----------------------|")
+    L.append(
+        "| Comparison | Task | Mean Δ (pp) | Median Δ (pp) | CI 95 % t (pp) | CI 95 % bootstrap (pp) | Cohen's d | Rank-bis. r | Wins / Losses / Ties | Wilcoxon W | p (Wilcoxon) | Holm p (W) | t | p (t-test) | Holm p (t) | Sign-test p | Shapiro p (normality) |"
+    )
+    L.append(
+        "|------------|------|-------------|---------------|----------------|------------------------|-----------|-------------|----------------------|------------|--------------|------------|---|------------|------------|-------------|-----------------------|"
+    )
     for r, p_t_adj, p_w_adj in zip(paired_results, t_adj, w_adj):
         L.append(
             f"| {r.label_a} vs {r.label_b} | {r.task} | "
-            f"{r.mean_diff*100:+.2f} | {r.median_diff*100:+.2f} | "
-            f"{r.t_ci_lo*100:+.2f}, {r.t_ci_hi*100:+.2f} | "
-            f"{r.boot_ci_lo*100:+.2f}, {r.boot_ci_hi*100:+.2f} | "
+            f"{r.mean_diff * 100:+.2f} | {r.median_diff * 100:+.2f} | "
+            f"{r.t_ci_lo * 100:+.2f}, {r.t_ci_hi * 100:+.2f} | "
+            f"{r.boot_ci_lo * 100:+.2f}, {r.boot_ci_hi * 100:+.2f} | "
             f"{r.cohen_d:.3f} | {r.rank_biserial:.3f} | "
             f"{r.n_wins} / {r.n_losses} / {r.n_ties} | "
             f"{r.w_stat:.0f} | {fmt_p(r.w_pval)} | {fmt_p(p_w_adj)} | "
@@ -567,7 +622,7 @@ def main() -> None:
     L.append("  comparisons correction.")
     L.append("- **Sign-test agreement** is a robustness check — when it agrees with")
     L.append("  Wilcoxon and t, magnitude/rank information is not strictly required to")
-    L.append("  reach the conclusion (\"JADE wins more often than it loses\" suffices).")
+    L.append('  reach the conclusion ("JADE wins more often than it loses" suffices).')
     L.append("")
 
     # ── §4 suggested phrasings ─────────────────────────────────────────────
@@ -589,13 +644,13 @@ def main() -> None:
         L.append(
             f"- **{r.label_a} vs {r.label_b}, {r.task}.** "
             f"{r.label_a} shows a mean {sign} of "
-            f"**{r.mean_diff*100:+.2f} pp** "
-            f"(95 % bootstrap CI: {r.boot_ci_lo*100:+.2f}, {r.boot_ci_hi*100:+.2f}; "
-            f"t-based CI: {r.t_ci_lo*100:+.2f}, {r.t_ci_hi*100:+.2f}). "
+            f"**{r.mean_diff * 100:+.2f} pp** "
+            f"(95 % bootstrap CI: {r.boot_ci_lo * 100:+.2f}, {r.boot_ci_hi * 100:+.2f}; "
+            f"t-based CI: {r.t_ci_lo * 100:+.2f}, {r.t_ci_hi * 100:+.2f}). "
             f"The paired difference is **{verdict_w}** "
             f"(Wilcoxon W = {r.w_stat:.0f}, p = {fmt_p(r.w_pval)}, "
             f"Holm-adjusted p = {fmt_p(p_w_adj)}; "
-            f"paired t-test t({r.n-1}) = {r.t_stat:+.2f}, p = {fmt_p(r.t_pval)}; "
+            f"paired t-test t({r.n - 1}) = {r.t_stat:+.2f}, p = {fmt_p(r.t_pval)}; "
             f"sign-test p = {fmt_p(r.sign_pval)} on {r.n_wins}/{r.n_nonzero} wins). "
             f"Effect size: Cohen's d = {r.cohen_d:.2f}, "
             f"rank-biserial r = {r.rank_biserial:.2f}." + normality_note
