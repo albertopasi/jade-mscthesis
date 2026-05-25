@@ -43,8 +43,6 @@ extracted directly from the JSON summaries committed to `main-results/`.
   - **Subject-wise accuracy** = per-subject mean accuracy over its windows.
     The reported headline mean/std is over the 123 subject accuracies (this is
     the standard cross-subject literature metric).
-  - **Window-wise accuracy** = pooled over all val windows, ignoring subject
-    membership. Reported for completeness.
   - **Macro F1, macro AUROC** = unweighted average across classes; AUROC is
     one-vs-rest.
   - **Per-class P / R / F1** = the standard sklearn computation per class on
@@ -58,21 +56,21 @@ This is the single most important table for the Results section. Same metrics
 for all three methods on both tasks. All accuracies are subject-wise mean ±
 std (N = 123 subjects).
 
-| Method | Task    | Mean acc        | Window acc | Macro F1 | Macro AUROC | Min subj | Max subj |
-|--------|---------|-----------------|------------|----------|-------------|----------|----------|
-| LP     | 9-class | 50.27 ± 13.69 % | 50.27 %    | 0.5045   | 0.8335      | 10.71 %  | 85.71 %  |
-| SFT    | 9-class | 58.52 ± 14.01 % | 58.52 %    | 0.5893   | 0.8852      |  7.14 %  | 85.71 %  |
-| JADE   | 9-class | **62.03 ± 14.70 %** | **62.03 %** | **0.6251** | **0.9018** | 10.71 %  | **86.90 %** |
-| LP     | binary  | 71.64 ±  9.29 % | 71.64 %    | 0.7161   | 0.7707      | 50.00 %  | 94.44 %  |
-| SFT    | binary  | 75.52 ±  7.76 % | 75.52 %    | 0.7551   | 0.8182      | 50.00 %  | 93.06 %  |
-| JADE   | binary  | **76.32 ±  8.12 %** | **76.32 %** | **0.7632** | **0.8265** | **52.78 %** | **97.22 %** |
+| Method | Task    | Mean acc           | Macro F1   | Macro AUROC | Min subj   | Max subj   |
+|--------|---------|--------------------|------------|-------------|------------|------------|
+| LP     | 9-class | 50.27 ± 13.69 %    | 50.45 %    | 83.35 %     | 10.71 %    | 85.71 %    |
+| SFT    | 9-class | 58.52 ± 14.01 %    | 58.93 %    | 88.52 %     |  7.14 %    | 85.71 %    |
+| JADE   | 9-class | **62.03 ± 14.70 %**| **62.51 %**| **90.18 %** | 10.71 %    | **86.90 %**|
+| LP     | binary  | 71.64 ±  9.29 %    | 71.61 %    | 77.07 %     | 50.00 %    | 94.44 %    |
+| SFT    | binary  | 75.52 ±  7.76 %    | 75.51 %    | 81.82 %     | 50.00 %    | 93.06 %    |
+| JADE   | binary  | **76.32 ±  8.12 %**| **76.32 %**| **82.65 %** | **52.78 %**| **97.22 %**|
 
 **Headline improvements (all numbers in percentage points):**
 
-| Task     | SFT − LP  | JADE − SFT | JADE − LP |
-|----------|-----------|------------|-----------|
-| 9-class  | +8.25 pp  | **+3.51 pp** | +11.76 pp |
-| Binary   | +3.88 pp  | **+0.80 pp** | +4.69 pp  |
+| Task     | SFT − LP  | JADE − SFT   | JADE − LP  |
+|----------|-----------|--------------|------------|
+| 9-class  | +8.25 pp  | **+3.51 pp** | +11.76 pp  |
+| Binary   | +3.88 pp  | **+0.80 pp** | +4.69 pp   |
 
 **Reading the table.** Fine-tuning gives the largest absolute gain over the
 linear probe in both tasks (+8.25 pp on 9-class, +3.88 pp on binary). On top of
@@ -88,33 +86,31 @@ discussion below.
 
 From `src/visualization/jade_9-class/figures/per_class_metrics.csv`:
 
-| Class        | Precision | Recall | F1    | Support |
-|--------------|-----------|--------|-------|---------|
-| Anger        | 0.635     | 0.640  | 0.637 | 1107    |
-| Disgust      | 0.617     | 0.613  | 0.615 | 1107    |
-| Fear         | 0.664     | 0.630  | 0.647 | 1107    |
-| Sadness      | 0.483     | 0.488  | 0.485 | 1107    |
-| Neutral      | 0.500     | 0.547  | 0.522 | 1476    |
-| Amusement    | 0.702     | 0.704  | 0.703 | 1107    |
-| Inspiration  | 0.638     | 0.647  | 0.642 | 1107    |
-| Joy          | 0.693     | 0.649  | 0.670 | 1107    |
-| Tenderness   | 0.720     | 0.688  | 0.704 | 1107    |
-| **Macro avg**| **0.628** | **0.623** | **0.625** | 10332 |
+| Class        | Precision  | Recall     | F1         |
+|--------------|------------|------------|------------|
+| Anger        | 63.50 %    | 63.96 %    | 63.73 %    |
+| Disgust      | 61.67 %    | 61.34 %    | 61.50 %    |
+| Fear         | 66.41 %    | 63.05 %    | 64.69 %    |
+| Sadness      | 48.30 %    | 48.78 %    | 48.54 %    |
+| Neutral      | 49.97 %    | 54.74 %    | 52.25 %    |
+| Amusement    | 70.18 %    | 70.37 %    | 70.28 %    |
+| Inspiration  | 63.76 %    | 64.68 %    | 64.22 %    |
+| Joy          | 69.27 %    | 64.95 %    | 67.04 %    |
+| Tenderness   | 71.95 %    | 68.83 %    | 70.36 %    |
+| **Macro avg**| **62.78 %**| **62.30 %**| **62.51 %**|
 
-Tenderness (0.704), Amusement (0.703) and Joy (0.670) are the easiest
-classes; Sadness (0.485) and Neutral (0.522) are the hardest. The Neutral row
-has higher support (1476 vs 1107) because that class is *not* dropped in
-9-class mode (it is only dropped in binary mode).
+Tenderness (70.36 %), Amusement (70.28 %) and Joy (67.04 %) are the easiest
+classes; Sadness (48.54 %) and Neutral (52.25 %) are the hardest.
 
 ### 3.2 JADE binary — full table
 
 From `src/visualization/jade_binary/figures/per_class_metrics.csv`:
 
-| Class        | Precision | Recall | F1    | Support |
-|--------------|-----------|--------|-------|---------|
-| Negative     | 0.765     | 0.761  | 0.763 | 4428    |
-| Positive     | 0.762     | 0.766  | 0.764 | 4428    |
-| **Macro avg**| **0.763** | **0.763** | **0.763** | 8856 |
+| Class        | Precision  | Recall     | F1         |
+|--------------|------------|------------|------------|
+| Negative     | 76.46 %    | 76.06 %    | 76.26 %    |
+| Positive     | 76.19 %    | 76.58 %    | 76.38 %    |
+| **Macro avg**| **76.32 %**| **76.32 %**| **76.32 %**|
 
 Performance is nearly symmetric across the two classes — no positive/negative
 bias.
@@ -125,31 +121,31 @@ This is what the figure `per_class_f1_bars_with_lp.pdf` displays graphically.
 
 **9-class:**
 
-| Class       | LP    | SFT   | JADE  | Δ(JADE−SFT) |
-|-------------|-------|-------|-------|-------------|
-| Anger       | 0.504 | 0.607 | 0.637 | **+3.08** pp |
-| Disgust     | 0.519 | 0.561 | 0.615 | **+5.37** pp |
-| Fear        | 0.518 | 0.608 | 0.647 | **+3.86** pp |
-| Sadness     | 0.385 | 0.476 | 0.485 |  +0.90 pp |
-| Neutral     | 0.457 | 0.497 | 0.522 |  +2.55 pp |
-| Amusement   | 0.565 | 0.668 | 0.703 |  +3.49 pp |
-| Inspiration | 0.469 | 0.588 | 0.642 | **+5.39** pp |
-| Joy         | 0.567 | 0.638 | 0.670 |  +3.19 pp |
-| Tenderness  | 0.556 | 0.659 | 0.704 |  +4.41 pp |
-| **Macro avg** | **0.504** | **0.589** | **0.625** | **+3.58 pp** |
+| Class       | LP        | SFT       | JADE      | Δ(JADE−SFT)  |
+|-------------|-----------|-----------|-----------|--------------|
+| Anger       | 50.36 %   | 60.65 %   | 63.73 %   | **+3.08 pp** |
+| Disgust     | 51.87 %   | 56.13 %   | 61.50 %   | **+5.37 pp** |
+| Fear        | 51.77 %   | 60.83 %   | 64.69 %   | **+3.86 pp** |
+| Sadness     | 38.54 %   | 47.64 %   | 48.54 %   |  +0.90 pp    |
+| Neutral     | 45.69 %   | 49.70 %   | 52.25 %   |  +2.55 pp    |
+| Amusement   | 56.54 %   | 66.79 %   | 70.28 %   |  +3.49 pp    |
+| Inspiration | 46.88 %   | 58.83 %   | 64.22 %   | **+5.39 pp** |
+| Joy         | 56.72 %   | 63.85 %   | 67.04 %   |  +3.19 pp    |
+| Tenderness  | 55.64 %   | 65.95 %   | 70.36 %   |  +4.41 pp    |
+| **Macro avg** | **50.45 %** | **58.93 %** | **62.51 %** | **+3.58 pp** |
 
 Every class improves under JADE relative to SFT on 9-class. The largest gains
-are on **Inspiration (+5.39)**, **Disgust (+5.37)** and **Tenderness (+4.41)**.
-Sadness gains the least (+0.90) — it is also the hardest class in absolute
-terms.
+are on **Inspiration (+5.39 pp)**, **Disgust (+5.37 pp)** and
+**Tenderness (+4.41 pp)**. Sadness gains the least (+0.90 pp) — it is also the
+hardest class in absolute terms.
 
 **Binary:**
 
-| Class    | LP    | SFT   | JADE  | Δ(JADE−SFT) |
-|----------|-------|-------|-------|-------------|
-| Negative | 0.707 | 0.759 | 0.763 | +0.36 pp |
-| Positive | 0.725 | 0.751 | 0.764 | +1.25 pp |
-| **Macro avg** | **0.716** | **0.755** | **0.763** | **+0.81 pp** |
+| Class    | LP        | SFT       | JADE      | Δ(JADE−SFT)  |
+|----------|-----------|-----------|-----------|--------------|
+| Negative | 70.68 %   | 75.90 %   | 76.26 %   | +0.36 pp     |
+| Positive | 72.53 %   | 75.13 %   | 76.38 %   | +1.25 pp     |
+| **Macro avg** | **71.61 %** | **75.51 %** | **76.32 %** | **+0.81 pp** |
 
 Per-class gains on binary are small and roughly symmetric, consistent with the
 near-flat headline accuracy gain.
@@ -162,23 +158,23 @@ Row-normalized percentages (each row sums to 100 %, diagonal = recall).
 
 ### 4.1 9-class
 
-|              | Anger | Disgust | Fear | Sadness | Neutral | Amuse | Inspir | Joy  | Tender |
-|--------------|------:|--------:|-----:|--------:|--------:|------:|-------:|-----:|-------:|
-| **Anger**    | **64.0** | 4.8 | 3.4 | 5.5 | 8.6 | 2.8 | 4.7 | 3.3 | 3.0 |
-| **Disgust**  | 6.1 | **61.3** | 2.9 | 7.1 | 11.3 | 2.4 | 3.6 | 3.0 | 2.2 |
-| **Fear**     | 4.2 | 2.6 | **63.1** | 6.1 | 8.5 | 6.0 | 3.1 | 2.6 | 3.9 |
-| **Sadness**  | 5.0 | 7.2 | 6.1 | **48.8** | 16.2 | 2.8 | 5.9 | 4.6 | 3.5 |
-| **Neutral**  | 6.3 | 7.2 | 4.3 | 10.2 | **54.7** | 4.0 | 5.3 | 4.3 | 3.6 |
-| **Amusement**| 2.2 | 2.6 | 3.3 | 5.1 | 6.9 | **70.4** | 3.4 | 3.2 | 3.0 |
-| **Inspiration** | 4.3 | 4.1 | 3.1 | 5.2 | 7.9 | 3.3 | **64.7** | 4.4 | 3.1 |
-| **Joy**      | 4.2 | 5.0 | 3.1 | 4.8 | 7.0 | 3.3 | 4.2 | **65.0** | 3.4 |
-| **Tenderness**| 2.3 | 2.3 | 4.2 | 4.7 | 6.8 | 4.0 | 4.9 | 2.0 | **68.8** |
+|              | Anger     | Disgust   | Fear      | Sadness   | Neutral   | Amuse     | Inspir    | Joy       | Tender    |
+|--------------|----------:|----------:|----------:|----------:|----------:|----------:|----------:|----------:|----------:|
+| **Anger**    | **63.96** | 4.79      | 3.43      | 5.51      | 8.58      | 2.80      | 4.70      | 3.25      | 2.98      |
+| **Disgust**  | 6.14      | **61.34** | 2.89      | 7.14      | 11.29     | 2.44      | 3.61      | 2.98      | 2.17      |
+| **Fear**     | 4.16      | 2.62      | **63.05** | 6.14      | 8.49      | 5.96      | 3.07      | 2.62      | 3.88      |
+| **Sadness**  | 4.97      | 7.23      | 6.05      | **48.78** | 16.17     | 2.80      | 5.87      | 4.61      | 3.52      |
+| **Neutral**  | 6.30      | 7.18      | 4.34      | 10.23     | **54.74** | 4.00      | 5.28      | 4.34      | 3.59      |
+| **Amusement**| 2.17      | 2.62      | 3.34      | 5.06      | 6.87      | **70.37** | 3.43      | 3.16      | 2.98      |
+| **Inspiration** | 4.34   | 4.07      | 3.07      | 5.24      | 7.86      | 3.25      | **64.68** | 4.43      | 3.07      |
+| **Joy**      | 4.25      | 4.97      | 3.07      | 4.79      | 7.05      | 3.34      | 4.16      | **64.95** | 3.43      |
+| **Tenderness**| 2.35     | 2.26      | 4.25      | 4.70      | 6.78      | 3.97      | 4.88      | 1.99      | **68.83** |
 
 **Observations to highlight in the prose:**
-1. **All diagonal entries are above chance (11.1 %) by a wide margin** — the
-   weakest class still hits 48.8 %.
-2. **Sadness is the hardest** (48.8 % recall) and gets confused most often with
-   Neutral (16.2 %).
+1. **All diagonal entries are above chance (11.11 %) by a wide margin** — the
+   weakest class still hits 48.78 %.
+2. **Sadness is the hardest** (48.78 % recall) and gets confused most often with
+   Neutral (16.17 %).
 3. **Neutral attracts errors from most other classes** — it is the off-diagonal
    "magnet" column (the 8–16 % range in column Neutral across rows). This is
    consistent with Neutral being an ambiguous middle category.
@@ -188,12 +184,12 @@ Row-normalized percentages (each row sums to 100 %, diagonal = recall).
 
 ### 4.2 Binary
 
-|              | Negative | Positive |
-|--------------|---------:|---------:|
-| **Negative** | **76.1** | 23.9 |
-| **Positive** | 23.4 | **76.6** |
+|              | Negative  | Positive  |
+|--------------|----------:|----------:|
+| **Negative** | **76.06** | 23.94     |
+| **Positive** | 23.42     | **76.58** |
 
-Errors are symmetric (23.9 ↔ 23.4): no valence bias.
+Errors are symmetric (23.94 ↔ 23.42): no valence bias.
 
 ---
 
@@ -201,10 +197,10 @@ Errors are symmetric (23.9 ↔ 23.4): no valence bias.
 
 ### 5.1 Distribution statistics (JADE)
 
-| Task    | N   | Mean    | Std   | Median  | Min     | Max     | Q25     | Q75     | Below chance |
-|---------|-----|---------|-------|---------|---------|---------|---------|---------|--------------|
-| 9-class | 123 | 62.03 % | 14.70 | 64.29 % | 10.71 % | 86.90 % | 52.38 % | 72.62 % | 1 / 123 |
-| Binary  | 123 | 76.32 % |  8.12 | 77.78 % | 52.78 % | 97.22 % | 70.83 % | 81.94 % | 0 / 123 |
+| Task    | N   | Mean       | Std    | Median     | Min        | Max        | Q25        | Q75        | Below chance |
+|---------|-----|------------|--------|------------|------------|------------|------------|------------|--------------|
+| 9-class | 123 | 62.03 %    | 14.70  | 64.29 %    | 10.71 %    | 86.90 %    | 52.38 %    | 72.62 %    | 1 / 123      |
+| Binary  | 123 | 76.32 %    |  8.12  | 77.78 %    | 52.78 %    | 97.22 %    | 70.83 %    | 81.94 %    | 0 / 123      |
 
 **Key observations:**
 - The interquartile range is wide (~20 pp for 9-class, ~11 pp for binary):
@@ -213,26 +209,26 @@ Errors are symmetric (23.9 ↔ 23.4): no valence bias.
 - Only **1 subject out of 123 is below chance on 9-class**, and **none below
   chance on binary** — the model generalizes meaningfully to essentially every
   held-out subject.
-- The headline mean is **higher than the median** on 9-class (62.03 vs 64.29)
-  and roughly equal on binary (76.32 vs 77.78), so distributions are slightly
-  left-skewed by a tail of harder subjects.
+- The headline mean is **slightly lower than the median** on both tasks
+  (62.03 % vs 64.29 % on 9-class; 76.32 % vs 77.78 % on binary), so
+  distributions are slightly left-skewed by a tail of harder subjects.
 
 ### 5.2 Paired comparison — wins, losses, mean delta
 
-| Comparison              | N | JADE wins | JADE loses | Ties | Mean Δ      |
-|-------------------------|---|-----------|------------|------|-------------|
-| 9-class, JADE vs SFT    | 123 | **88** | 22 | 13 | **+3.51 pp** |
-| 9-class, JADE vs LP     | 123 | **113** | 6 | 4 | **+11.76 pp** |
-| Binary,  JADE vs SFT    | 123 | 61 | 49 | 13 | +0.80 pp |
-| Binary,  JADE vs LP     | 123 | **91** | 26 | 6 | **+4.69 pp** |
+| Comparison              | N   | JADE wins | JADE loses | Ties | Mean Δ         |
+|-------------------------|-----|-----------|------------|------|----------------|
+| 9-class, JADE vs SFT    | 123 | **88**    | 22         | 13   | **+3.51 pp**   |
+| 9-class, JADE vs LP     | 123 | **113**   | 6          | 4    | **+11.76 pp**  |
+| Binary,  JADE vs SFT    | 123 | 61        | 49         | 13   | +0.80 pp       |
+| Binary,  JADE vs LP     | 123 | **91**    | 26         | 6    | **+4.69 pp**   |
 
 **Reading these counts:**
-- On **9-class**, JADE outperforms SFT on **88 of 123 subjects (72 %)** — the
-  improvement is broad-based, not driven by a handful of outliers.
+- On **9-class**, JADE outperforms SFT on **88 of 123 subjects (71.54 %)** —
+  the improvement is broad-based, not driven by a handful of outliers.
 - On **binary**, the win/loss split is much closer to even (61/49), consistent
   with the marginal +0.80 pp mean gain.
-- Against LP, JADE wins on **92 % of subjects in 9-class** and **74 % of
-  subjects in binary**.
+- Against LP, JADE wins on **91.87 % of subjects in 9-class** (113/123) and
+  **73.98 % of subjects in binary** (91/123).
 
 ---
 
@@ -249,8 +245,8 @@ script with `--title`.
 |------|------|---------------|-------------------|
 | `src/visualization/jade_9-class/figures/confusion_matrix.pdf` | 9-class | JADE confusion matrix, row-normalized percentages. Power-norm colormap (γ=0.55) for off-diagonal contrast. | Main per-class error analysis (cite alongside §4.1). |
 | `src/visualization/jade_binary/figures/confusion_matrix.pdf`  | binary  | JADE binary CM, row-normalized. | Shows balanced errors (cite alongside §4.2). |
-| `src/visualization/jade_9-class/figures/subject_histogram.pdf` | 9-class | 123 subjects sorted ascending by accuracy. Green dashed line = mean (62.0 %), red dotted line = chance (11.1 %). Side bar shows mean ± std. | The cross-subject variability figure. Use alongside §5.1. |
-| `src/visualization/jade_binary/figures/subject_histogram.pdf`  | binary | Same layout for binary (chance = 50 %). | Same role for binary. |
+| `src/visualization/jade_9-class/figures/subject_histogram.pdf` | 9-class | 123 subjects sorted ascending by accuracy. Green dashed line = mean (62.03 %), red dotted line = chance (11.11 %). Side bar shows mean ± std. | The cross-subject variability figure. Use alongside §5.1. |
+| `src/visualization/jade_binary/figures/subject_histogram.pdf`  | binary | Same layout for binary (chance = 50.00 %). | Same role for binary. |
 | `src/visualization/jade_9-class/figures/per_class_f1_bars.pdf` | 9-class | Per-class F1 bars JADE vs SFT side-by-side + Macro avg group. Δ(JADE−SFT) annotated in pp above each pair. | Visual summary of §3.3 (9-class). |
 | `src/visualization/jade_binary/figures/per_class_f1_bars.pdf`  | binary  | Same for binary. | §3.3 (binary). |
 | `src/visualization/jade_9-class/figures/per_class_f1_bars_with_lp.pdf` | 9-class | Same as above but with 3 bars per class (LP / SFT / JADE). Δ annotation still shows JADE − SFT. | Optional alternative — broader context showing how much of the gain is FT vs how much is SupCon on top. |
@@ -286,14 +282,15 @@ learning depends on the task.**
 ### 7.2 Sub-narrative A — 9-class: SupCon helps broadly and per class
 
 - Improvement is **broad-based, not outlier-driven**: JADE beats SFT on 88
-  out of 123 subjects (72 %; cf. §5.2).
+  out of 123 subjects (71.54 %; cf. §5.2).
 - Improvement is **broad across classes**: all 9 classes improve under JADE
   vs SFT; the largest gains are on Inspiration (+5.39 pp), Disgust (+5.37 pp)
   and Tenderness (+4.41 pp) (cf. §3.3).
-- Confusion patterns suggest that the **hardest class is Sadness** (48.8 %
-  recall) and the **principal error mode is confusion with Neutral** (16.2 %
-  off-diagonal); Neutral itself acts as an error magnet across rows (cf. §4.1).
-- Cross-subject variability is high (std = 14.7 pp, range 10.7 % – 86.9 %),
+- Confusion patterns suggest that the **hardest class is Sadness** (48.78 %
+  recall) and the **principal error mode is confusion with Neutral**
+  (16.17 % off-diagonal); Neutral itself acts as an error magnet across rows
+  (cf. §4.1).
+- Cross-subject variability is high (std = 14.70 pp, range 10.71 % – 86.90 %),
   but only 1/123 subjects fall below chance — the model generalizes broadly
   (cf. §5.1).
 
@@ -320,10 +317,10 @@ learning depends on the task.**
   reported gain does not benefit from an under-tuned baseline. (This is a
   methodological norm of the thesis — see `CLAUDE.md` "thesis status".)
 - **AUROC.** Reported in the headline table for completeness (macro AUROC
-  rises from 0.834 (LP) to 0.885 (SFT) to 0.902 (JADE) on 9-class). No ROC
-  figure was produced — for a 9-class problem the curves overlap heavily and
-  add little beyond the single AUROC number.
-- **The “averaged accuracy” side bar** in the subject-histogram figures is
+  rises from 83.35 % (LP) to 88.52 % (SFT) to 90.18 % (JADE) on 9-class). No
+  ROC figure was produced — for a 9-class problem the curves overlap heavily
+  and add little beyond the single AUROC number.
+- **The "averaged accuracy" side bar** in the subject-histogram figures is
   the mean ± std of subject accuracies for that task (matching the
   headline-table row for JADE on that task), provided so the figure can be
   read standalone.
@@ -334,14 +331,14 @@ learning depends on the task.**
 
 For the report writer to quote without recomputation:
 
-- JADE 9-class: **62.03 ± 14.70 %** subject-wise; macro F1 **0.6251**; macro AUROC **0.9018**.
-- JADE binary:  **76.32 ±  8.12 %** subject-wise; macro F1 **0.7632**; macro AUROC **0.8265**.
-- SFT 9-class:  **58.52 ± 14.01 %**; macro F1 **0.5893**; macro AUROC **0.8852**.
-- SFT binary:   **75.52 ±  7.76 %**; macro F1 **0.7551**; macro AUROC **0.8182**.
-- LP 9-class:   **50.27 ± 13.69 %**; macro F1 **0.5045**; macro AUROC **0.8335**.
-- LP binary:    **71.64 ±  9.29 %**; macro F1 **0.7161**; macro AUROC **0.7707**.
+- JADE 9-class: **62.03 ± 14.70 %** subject-wise; macro F1 **62.51 %**; macro AUROC **90.18 %**.
+- JADE binary:  **76.32 ±  8.12 %** subject-wise; macro F1 **76.32 %**; macro AUROC **82.65 %**.
+- SFT 9-class:  **58.52 ± 14.01 %**; macro F1 **58.93 %**; macro AUROC **88.52 %**.
+- SFT binary:   **75.52 ±  7.76 %**; macro F1 **75.51 %**; macro AUROC **81.82 %**.
+- LP 9-class:   **50.27 ± 13.69 %**; macro F1 **50.45 %**; macro AUROC **83.35 %**.
+- LP binary:    **71.64 ±  9.29 %**; macro F1 **71.61 %**; macro AUROC **77.07 %**.
 - 9-class gain (JADE − SFT): **+3.51 pp** accuracy / **+3.58 pp** macro F1.
 - Binary gain  (JADE − SFT): **+0.80 pp** accuracy / **+0.81 pp** macro F1.
-- 9-class subject wins JADE > SFT: **88 / 123** (72 %).
-- Binary  subject wins JADE > SFT: **61 / 123** (50 %).
-- Subjects below chance: **1/123 on 9-class**, **0/123 on binary** (JADE).
+- 9-class subject wins JADE > SFT: **88 / 123** (71.54 %).
+- Binary  subject wins JADE > SFT: **61 / 123** (49.59 %).
+- Subjects below chance: **1 / 123 on 9-class**, **0 / 123 on binary** (JADE).
