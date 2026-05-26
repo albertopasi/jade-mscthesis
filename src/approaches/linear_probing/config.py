@@ -132,13 +132,17 @@ class LPConfig:
     def mixup_tag(self) -> str:
         return "" if self.use_mixup else "_nomixup"
 
-    def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
+    def run_name_stem(self, gen_seed: int | None = None) -> str:
+        """Run-name without the trailing _fold_K suffix (shared across folds)."""
         gen = f"_gen_s{gen_seed}" if gen_seed is not None else ""
         return (
             f"lp_{self.dataset}_{self.data_tag}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_{self.mode_tag}"
-            f"{self.norm_tag}{self.mixup_tag}{gen}_fold_{fold_idx}"
+            f"{self.norm_tag}{self.mixup_tag}{gen}"
         )
+
+    def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
+        return f"{self.run_name_stem(gen_seed)}_fold_{fold_idx}"
 
     def group_name(self) -> str:
         gen = "_gen" if self.generalization else ""

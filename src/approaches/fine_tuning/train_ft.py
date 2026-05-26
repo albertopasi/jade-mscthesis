@@ -264,7 +264,9 @@ def run_fold_ft(
             batch_size=cfg.batch_size,
             device=DEVICE,
             use_amp=cfg.use_amp,
-            num_workers=NUM_WORKERS,
+            # num_workers=0: keep batch order strictly aligned with val_ds.index
+            # (the trick used to recover per-window subject/stimulus IDs).
+            num_workers=0,
         )
         fold_predictions.fold = fold_idx
         fold_predictions.gen_seed = gen_seed

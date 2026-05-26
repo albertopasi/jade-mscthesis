@@ -83,6 +83,8 @@ from src.datasets.folds import (
     get_kfold_splits,
     get_stimulus_generalization_split,
 )
+from src.inference.aggregate import write_run_summary
+from src.inference.predictions import FoldPredictions, run_fold_inference
 
 
 def fmt_metric(val: float, decimals: int = 4) -> str:
@@ -374,6 +376,39 @@ def run_fold_official(
     # Train
     result = train_official_mode(cfg, model, train_loader, val_loader, DEVICE)
 
+    # Restore best-epoch (trainable-only) state into the live model so the
+    # in-training subject-wise inference uses the best checkpoint and not
+    # whatever weights the last training step left behind.
+    if result.get("best_state"):
+        model.load_state_dict(result["best_state"], strict=False)
+        model.to(DEVICE)
+
+    # Subject-wise inference on the best-epoch model (mirrors JADE/FT path).
+    fold_predictions: FoldPredictions | None = None
+    if result.get("best_state"):
+        print("\n>>> Subject-wise inference on best-epoch model")
+        fold_predictions = run_fold_inference(
+            model,
+            val_ds,
+            val_subject_ids,
+            batch_size=cfg.batch_size,
+            device=DEVICE,
+            use_amp=cfg.use_amp,
+            # num_workers=0: keep batch order strictly aligned with val_ds.index.
+            num_workers=0,
+        )
+        fold_predictions.fold = fold_idx
+        fold_predictions.gen_seed = gen_seed
+        fold_predictions.val_stimuli = sorted(val_stimuli) if val_stimuli is not None else None
+        n_subj = len(fold_predictions.per_subject_acc)
+        macro_subj = (
+            float(sum(fold_predictions.per_subject_acc.values()) / n_subj) if n_subj else float("nan")
+        )
+        print(
+            f"  window_acc={fold_predictions.window_acc:.4f}  "
+            f"macro_subject_acc={macro_subj:.4f}  n_subjects={n_subj}"
+        )
+
     # Save classifier weights
     ckpt_dir = OUTPUT_DIR / run_name
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -401,6 +436,7 @@ def run_fold_official(
 
     result["fold"] = fold_idx
     del result["best_state"]  # don't carry in summary
+    result["fold_predictions"] = fold_predictions
     return result
 
 
@@ -887,8 +923,41 @@ def main() -> None:
                 )
             fold_results.append(result)
 
+        # Strip non-serializable FoldPredictions before passing to summary
+        # printers and JSON-bound seed_summaries.
+        serializable_results = [
+            {k: v for k, v in r.items() if k != "fold_predictions"} for r in fold_results
+        ]
+
         if len(fold_results) > 1:
-            print_fold_summary(cfg, fold_results, gen_seed=gen_seed)
+            print_fold_summary(cfg, serializable_results, gen_seed=gen_seed)
+
+        # Generalization mode: emit a subject-wise summary JSON+NPZ for this
+        # seed. Fast mode skips (val_loader is TensorDataset, no .index → no
+        # FoldPredictions produced); official mode populates them.
+        if cfg.generalization:
+            fold_preds = [
+                r["fold_predictions"] for r in fold_results if r.get("fold_predictions") is not None
+            ]
+            if fold_preds:
+                json_path = write_run_summary(
+                    fold_preds,
+                    approach="lp",
+                    task=cfg.task_mode,
+                    dataset=cfg.dataset,
+                    run_stem=cfg.run_name_stem(gen_seed),
+                    out_root=PROJECT_ROOT / "main-results",
+                    gen_seed=gen_seed,
+                    generalization=True,
+                    extra_metadata={
+                        "pooling": cfg.pooling,
+                        "use_mixup": cfg.use_mixup,
+                        "lr": cfg.lr,
+                        "batch_size": cfg.batch_size,
+                        "official_mode": cfg.official_mode,
+                    },
+                )
+                print(f"Generalization summary → {json_path}")
 
         if gen_seed is not None:
             accs = [r["val_acc"] for r in fold_results if r.get("val_acc") is not None]
@@ -902,7 +971,7 @@ def main() -> None:
                     "mean_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
                     "mean_auroc": round(statistics.mean(aurocs), 4) if aurocs else None,
                     "mean_f1": round(statistics.mean(f1s), 4) if f1s else None,
-                    "folds": fold_results,
+                    "folds": serializable_results,
                 }
             )
 
