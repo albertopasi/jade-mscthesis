@@ -83,6 +83,8 @@ from src.datasets.folds import (
     get_official_split,
     get_stimulus_generalization_split,
 )
+from src.inference.aggregate import write_run_summary
+from src.inference.predictions import FoldPredictions, run_fold_inference
 
 # Per-fold runner
 
@@ -259,15 +261,43 @@ def run_fold_jade(
         supcon_temperature=cfg.supcon_temperature,
     )
 
-    # Save checkpoint
-    ckpt_dir = None
+    # Restore best FT state into the live model (used by both the
+    # subject-wise inference below and the optional checkpoint dump).
     if ft_result.get("best_state"):
-        ckpt_dir = OUTPUT_DIR / run_name
-        ckpt_dir.mkdir(parents=True, exist_ok=True)
-
-        # Restore best FT state
         model.load_state_dict(ft_result["best_state"])
         model.to(DEVICE)
+
+    # Subject-wise inference on the best-epoch model. Runs in-memory so it
+    # works without saving a checkpoint to disk first.
+    fold_predictions: FoldPredictions | None = None
+    if ft_result.get("best_state"):
+        print("\n>>> Subject-wise inference on best-epoch model")
+        fold_predictions = run_fold_inference(
+            model,
+            val_ds,
+            val_subject_ids,
+            batch_size=cfg.batch_size,
+            device=DEVICE,
+            use_amp=cfg.use_amp,
+            num_workers=NUM_WORKERS,
+        )
+        fold_predictions.fold = fold_idx
+        fold_predictions.gen_seed = gen_seed
+        fold_predictions.val_stimuli = sorted(val_stimuli) if val_stimuli is not None else None
+        n_subj = len(fold_predictions.per_subject_acc)
+        macro_subj = (
+            float(sum(fold_predictions.per_subject_acc.values()) / n_subj) if n_subj else float("nan")
+        )
+        print(
+            f"  window_acc={fold_predictions.window_acc:.4f}  "
+            f"macro_subject_acc={macro_subj:.4f}  n_subjects={n_subj}"
+        )
+
+    # Per-fold checkpoint files (opt-out via --no-save-checkpoints).
+    ckpt_dir: Path | None = None
+    if cfg.save_checkpoints and ft_result.get("best_state"):
+        ckpt_dir = OUTPUT_DIR / run_name
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
 
         if cfg.full_ft:
             # Full fine-tuning: save entire state dict (excluding projection head)
@@ -391,6 +421,7 @@ def run_fold_jade(
         "lp_train_loss": lp_result.get("train_loss"),
         "lp_val_acc": lp_result.get("val_acc"),
         "ckpt_dir": ckpt_dir,
+        "fold_predictions": fold_predictions,
     }
 
     if test_metrics is not None:
@@ -541,6 +572,16 @@ def parse_args() -> JADEConfig:
         "--gen-seeds", type=int, nargs="+", default=_d.gen_seeds, help="Seeds for stimulus splits"
     )
 
+    # Checkpointing
+    parser.add_argument(
+        "--no-save-checkpoints",
+        dest="save_checkpoints",
+        action="store_false",
+        default=_d.save_checkpoints,
+        help="Skip writing per-fold checkpoint files; rely on the in-training "
+        "subject-wise inference summary instead (used by --generalization runs).",
+    )
+
     args = parser.parse_args()
 
     lora_alpha = args.lora_alpha if args.lora_alpha is not None else args.lora_rank
@@ -577,6 +618,7 @@ def parse_args() -> JADEConfig:
         supcon_repr=args.supcon_repr,
         generalization=args.generalization,
         gen_seeds=args.gen_seeds,
+        save_checkpoints=args.save_checkpoints,
     )
 
 
@@ -737,12 +779,43 @@ def main() -> None:
             )
             fold_results.append(result)
 
+        # Strip non-serializable fields (ckpt_dir Path, FoldPredictions arrays)
+        # before passing to summary printers and JSON-bound seed_summaries.
+        serializable_results = [
+            {k: v for k, v in r.items() if k not in ("ckpt_dir", "fold_predictions")}
+            for r in fold_results
+        ]
+
         if len(fold_results) > 1:
-            print_fold_summary(
-                cfg,
-                [{k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results],
-                gen_seed=gen_seed,
-            )
+            print_fold_summary(cfg, serializable_results, gen_seed=gen_seed)
+
+        # Generalization mode: emit a subject-wise summary JSON+NPZ for this
+        # seed, mirroring the schema of main-results/<approach>_<task>/*.json.
+        if cfg.generalization:
+            fold_preds = [
+                r["fold_predictions"] for r in fold_results if r.get("fold_predictions") is not None
+            ]
+            if fold_preds:
+                json_path = write_run_summary(
+                    fold_preds,
+                    approach="jade",
+                    task=cfg.task_mode,
+                    dataset=cfg.dataset,
+                    run_stem=cfg.run_name_stem(gen_seed),
+                    out_root=PROJECT_ROOT / "main-results",
+                    gen_seed=gen_seed,
+                    generalization=True,
+                    extra_metadata={
+                        "supcon_alpha": cfg.supcon_alpha,
+                        "supcon_temperature": cfg.supcon_temperature,
+                        "supcon_repr": cfg.supcon_repr,
+                        "batch_size": cfg.batch_size,
+                        "ft_lr": cfg.ft_lr,
+                        "full_ft": cfg.full_ft,
+                        "lora_rank": cfg.lora_rank,
+                    },
+                )
+                print(f"Generalization summary → {json_path}")
 
         if gen_seed is not None:
             accs = [r["val_acc"] for r in fold_results if r.get("val_acc") is not None]
@@ -756,9 +829,7 @@ def main() -> None:
                     "mean_bal_acc": round(statistics.mean(bal_accs), 4) if bal_accs else None,
                     "mean_auroc": round(statistics.mean(aurocs), 4) if aurocs else None,
                     "mean_f1": round(statistics.mean(f1s), 4) if f1s else None,
-                    "folds": [
-                        {k: v for k, v in r.items() if k != "ckpt_dir"} for r in fold_results
-                    ],
+                    "folds": serializable_results,
                 }
             )
 

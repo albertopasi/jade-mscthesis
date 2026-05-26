@@ -89,6 +89,7 @@ class FTConfig:
     # ── Optional mode flags ───────────────────────────────────────────
     full_ft: bool = False  # True → full fine-tuning (no LoRA)
     reve_split: bool = False  # True → fixed train/val/test (FACED only)
+    save_checkpoints: bool = True  # False → skip per-fold checkpoint files on disk
 
     # ── Derived helpers ────────────────────────────────────────────────
 
@@ -132,13 +133,17 @@ class FTConfig:
     def _optim_tag(self) -> str:
         return f"b{self.batch_size}_lr{self.ft_lr:g}"
 
-    def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
+    def run_name_stem(self, gen_seed: int | None = None) -> str:
+        """Run-name without the trailing _fold_K suffix (shared across folds)."""
         gen = f"_gen_s{gen_seed}" if gen_seed is not None else ""
         return (
             f"ft_{self.dataset}_{self.task_mode}_"
             f"{self.window_tag}_{self.pool_tag}_"
-            f"r{self.lora_rank}_{self._optim_tag}{self.mixup_tag}{self._mode_tags}{gen}_fold_{fold_idx}"
+            f"r{self.lora_rank}_{self._optim_tag}{self.mixup_tag}{self._mode_tags}{gen}"
         )
+
+    def run_name(self, fold_idx: int, gen_seed: int | None = None) -> str:
+        return f"{self.run_name_stem(gen_seed)}_fold_{fold_idx}"
 
     def group_name(self) -> str:
         gen = "_gen" if self.generalization else ""

@@ -11,6 +11,12 @@ so pooling per-subject accuracies across folds gives one accuracy per
 subject in the dataset. The reported headline std is the std across those
 N_subjects accuracies (comparable to subject-wise std in literature).
 
+This script is the post-hoc entry point. The training pipelines
+(train_jade.py, train_ft.py) produce the same JSON+NPZ output without
+needing checkpoints when --generalization is used. Both paths share
+src.inference.predictions.run_fold_inference and
+src.inference.aggregate.write_run_summary so the schema lives in one place.
+
 Usage:
     uv run python -m src.inference.inference_subject_wise \\
         --approach lp --task 9-class \\
@@ -21,25 +27,16 @@ Usage:
         --approach ft --task 9-class \\
         --ckpt-root outputs/ft_checkpoints \\
         --run-stem ft_faced_9-class_w10s10_pool_no_r16_b256_lr0.0004_nomixup_fullft
-
-REVE paths default to local models/reve_pretrained_original/. Override
-with --reve-base / --reve-pos if needed.
-
-Output JSON written to: main-results/<approach>_<task>/<run-stem>.json
-(e.g. main-results/lp_9-class/, main-results/ft_binary/, main-results/jade_9-class/)
 """
 
 from __future__ import annotations
 
 import argparse
-import datetime
 import json
 from pathlib import Path
 
 import numpy as np
 import torch
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, roc_auc_score
-from torch.utils.data import DataLoader
 
 from src.approaches.fine_tuning.model import ReveClassifierFT
 from src.approaches.jade.model import ReveClassifierJADE
@@ -47,6 +44,8 @@ from src.approaches.linear_probing.model import ReveClassifierLP
 from src.approaches.shared.reve import get_channel_names, load_reve_and_positions
 from src.datasets.faced_dataset import FACEDWindowDataset
 from src.datasets.folds import get_all_subjects, get_kfold_splits
+from src.inference.aggregate import write_run_summary
+from src.inference.predictions import FoldPredictions, run_fold_inference
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 SAMPLING_RATE = 200
@@ -88,7 +87,6 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--n-folds", type=int, default=10)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    # JADE/FT extras (only used when building the model)
     p.add_argument(
         "--lora-rank",
         type=int,
@@ -96,10 +94,10 @@ def parse_args() -> argparse.Namespace:
         help="LoRA rank (FT/JADE — only matters when reading non-fullft checkpoints).",
     )
     p.add_argument(
-        "--out-path",
+        "--out-root",
         type=Path,
         default=None,
-        help="Output JSON path. Default: main-results/<approach>_<task>/<run-stem>.json",
+        help="Output root. Default: main-results/ at project root.",
     )
     return p.parse_args()
 
@@ -155,20 +153,15 @@ def load_weights(model: torch.nn.Module, ckpt_dir: Path, approach: str) -> None:
         # LP saves only trainable params: cls_query_token + linear_head
         state = torch.load(ckpt_dir / "classifier_weights.pt", map_location="cpu")
         missing, unexpected = model.load_state_dict(state, strict=False)
-        # missing should include all reve.* params (frozen, weights from REVE itself); unexpected should be empty
         if unexpected:
             raise RuntimeError(f"Unexpected keys in LP ckpt: {unexpected[:5]}...")
         return
     if approach in ("ft", "jade"):
-        # Full-FT path: single full_model.pt with the entire (non-projection-head) state dict
         full_path = ckpt_dir / "full_model.pt"
         if full_path.exists():
             state = torch.load(full_path, map_location="cpu")
             model.load_state_dict(state, strict=False)
             return
-        # LoRA path: adapter + head separately. Not supported in this script yet —
-        # would need to wrap encoder with peft before loading. The current re-runs
-        # are full-ft only, so we don't need this branch right now.
         raise NotImplementedError(
             f"Only full_model.pt loading implemented; {ckpt_dir} has no full_model.pt"
         )
@@ -192,62 +185,9 @@ def get_val_subjects_for_fold(
     return [all_subjects[i] for i in val_idx]
 
 
-@torch.no_grad()
-def infer_one_fold(
-    model: torch.nn.Module,
-    val_ds: FACEDWindowDataset,
-    val_subjects: list[int],
-    batch_size: int,
-    device: str,
-) -> dict:
-    """Run inference on a fold's val set, returning per-window arrays.
-
-    Critical: shuffle=False + num_workers=0 so that batch order matches
-    `val_ds.index`, letting us recover the subject_id per window via index lookup.
-    """
-    loader = DataLoader(
-        val_ds, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True
-    )
-    model.eval()
-    y_true_all, y_pred_all, y_prob_all = [], [], []
-    for eeg, label in loader:
-        eeg = eeg.to(device, non_blocking=True)
-        logits = model(eeg)
-        probs = torch.softmax(logits, dim=-1).cpu().numpy()
-        preds = logits.argmax(dim=-1).cpu().numpy()
-        y_pred_all.append(preds)
-        y_prob_all.append(probs)
-        y_true_all.append(label.numpy())
-    y_true = np.concatenate(y_true_all).astype(int)
-    y_pred = np.concatenate(y_pred_all).astype(int)
-    y_prob = np.concatenate(y_prob_all).astype(np.float32)
-    # Subject id per window: dataset.index[i] = (sid, stim_idx, window_start)
-    subj_ids = np.array([val_ds.index[i][0] for i in range(len(val_ds))], dtype=int)
-    assert len(subj_ids) == len(y_true), f"index mismatch {len(subj_ids)} vs {len(y_true)}"
-    # Per-subject accuracy
-    per_subject_acc: dict[int, float] = {}
-    per_subject_support: dict[int, int] = {}
-    for sid in val_subjects:
-        mask = subj_ids == sid
-        if mask.sum() == 0:
-            continue
-        per_subject_acc[sid] = float((y_pred[mask] == y_true[mask]).mean())
-        per_subject_support[sid] = int(mask.sum())
-    return {
-        "y_true": y_true.tolist(),
-        "y_pred": y_pred.tolist(),
-        "y_prob": y_prob,
-        "subj_ids": subj_ids.tolist(),
-        "per_subject_acc": per_subject_acc,
-        "per_subject_support": per_subject_support,
-        "fold_acc_window": float((y_pred == y_true).mean()),
-    }
-
-
 def main() -> None:
     args = parse_args()
     project_root = Path(__file__).resolve().parents[2]
-    # Switch CWD to project root so relative paths in DATA_ROOTS work
     data_root = (project_root / DATA_ROOTS[args.dataset]).resolve()
     if not data_root.exists():
         raise FileNotFoundError(f"Data root not found: {data_root}")
@@ -262,8 +202,6 @@ def main() -> None:
     print(f"REVE base: {args.reve_base}")
     print(f"Window: {args.window}s, stride: {args.stride}s, pooling: {args.pooling}\n")
 
-    # Load REVE once (shared across all folds; frozen for LP, finetuned weights
-    # get loaded on top per-fold for FT/JADE)
     channel_names = get_channel_names(args.dataset)
     reve_model, pos_tensor = load_reve_and_positions(
         channel_names,
@@ -274,13 +212,7 @@ def main() -> None:
 
     all_subjects = get_all_subjects(args.dataset)
 
-    fold_results: list[dict] = []
-    pooled_per_subject_acc: dict[int, float] = {}
-    pooled_per_subject_support: dict[int, int] = {}
-    pooled_y_true: list[int] = []
-    pooled_y_pred: list[int] = []
-    pooled_y_prob: list[np.ndarray] = []
-    pooled_subj_ids: list[int] = []
+    fold_preds: list[FoldPredictions] = []
 
     for fold_idx in range(1, args.n_folds + 1):
         ckpt_dir = args.ckpt_root / f"{args.run_stem}_fold_{fold_idx}"
@@ -291,7 +223,6 @@ def main() -> None:
         val_subjects = get_val_subjects_for_fold(ckpt_dir, fold_idx, all_subjects, args.n_folds)
         print(f"[fold {fold_idx}] val_subjects ({len(val_subjects)}): {val_subjects}")
 
-        # Build val dataset
         val_ds = FACEDWindowDataset(
             subject_ids=val_subjects,
             task_mode=args.task,
@@ -300,7 +231,6 @@ def main() -> None:
             stride=stride,
         )
 
-        # Build model fresh per fold + load weights
         model = build_model(
             args.approach,
             args.task,
@@ -313,158 +243,57 @@ def main() -> None:
         load_weights(model, ckpt_dir, args.approach)
         model.to(args.device)
 
-        out = infer_one_fold(model, val_ds, val_subjects, args.batch_size, args.device)
-        fold_acc_macro = (
-            float(np.mean(list(out["per_subject_acc"].values())))
-            if out["per_subject_acc"]
-            else float("nan")
+        fp = run_fold_inference(
+            model,
+            val_ds,
+            val_subjects,
+            batch_size=args.batch_size,
+            device=args.device,
+            use_amp=False,  # post-hoc inference: prefer determinism over speed
+        )
+        fp.fold = fold_idx
+        # Post-hoc inference reproduces the standard k-fold val set, so no held-out stimuli.
+        fold_preds.append(fp)
+
+        macro_subject_acc = (
+            float(np.mean(list(fp.per_subject_acc.values()))) if fp.per_subject_acc else float("nan")
         )
         print(
-            f"[fold {fold_idx}] window_acc={out['fold_acc_window']:.4f}  "
-            f"macro_subject_acc={fold_acc_macro:.4f}  n_subjects={len(out['per_subject_acc'])}"
+            f"[fold {fold_idx}] window_acc={fp.window_acc:.4f}  "
+            f"macro_subject_acc={macro_subject_acc:.4f}  n_subjects={len(fp.per_subject_acc)}"
         )
 
-        fold_results.append(
-            {
-                "fold": fold_idx,
-                "val_subjects": val_subjects,
-                "window_acc": out["fold_acc_window"],
-                "macro_subject_acc": fold_acc_macro,
-                "per_subject_acc": out["per_subject_acc"],
-            }
-        )
-
-        for sid, acc in out["per_subject_acc"].items():
-            if sid in pooled_per_subject_acc:
-                raise RuntimeError(f"Subject {sid} appeared in two folds — split overlap bug")
-            pooled_per_subject_acc[sid] = acc
-            pooled_per_subject_support[sid] = out["per_subject_support"][sid]
-
-        pooled_y_true.extend(out["y_true"])
-        pooled_y_pred.extend(out["y_pred"])
-        pooled_y_prob.append(out["y_prob"])
-        pooled_subj_ids.extend(out["subj_ids"])
-
-        # Free memory
         del model, val_ds
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    # ── Aggregate ────────────────────────────────────────────────────────────
-    subject_accs = np.array(list(pooled_per_subject_acc.values()))
-    n_subjects = len(subject_accs)
-    print(f"\n=== Pooled across {len(fold_results)} folds ===")
-    print(f"  N subjects: {n_subjects}")
-    print(f"  Subject-wise acc: mean={subject_accs.mean():.4f}  std={subject_accs.std(ddof=1):.4f}")
-    print(f"  Window-wise acc:  {(np.array(pooled_y_pred) == np.array(pooled_y_true)).mean():.4f}")
+    if not fold_preds:
+        raise RuntimeError("No fold checkpoints found — nothing to aggregate.")
 
-    # Confusion matrix + per-class P/R/F1
-    labels = sorted(set(pooled_y_true) | set(pooled_y_pred))
-    cm = confusion_matrix(pooled_y_true, pooled_y_pred, labels=labels)
-    precision, recall, f1, support = precision_recall_fscore_support(
-        pooled_y_true, pooled_y_pred, labels=labels, zero_division=0
-    )
-    macro_p, macro_r, macro_f1, _ = precision_recall_fscore_support(
-        pooled_y_true, pooled_y_pred, labels=labels, average="macro", zero_division=0
+    out_root = args.out_root or (project_root / "main-results")
+    json_path = write_run_summary(
+        fold_preds,
+        approach=args.approach,
+        task=args.task,
+        dataset=args.dataset,
+        run_stem=args.run_stem,
+        out_root=out_root,
+        generalization=False,
     )
 
-    print("\n  Per-class:")
-    print(f"  {'class':>6}  {'P':>8}  {'R':>8}  {'F1':>8}  {'support':>8}")
-    for i, lbl in enumerate(labels):
+    # Brief stdout summary for the operator.
+    subject_accs = np.array(
+        [a for fp in fold_preds for a in fp.per_subject_acc.values()], dtype=float
+    )
+    print(f"\n=== Pooled across {len(fold_preds)} folds ===")
+    print(f"  N subjects: {len(subject_accs)}")
+    if len(subject_accs) > 1:
         print(
-            f"  {lbl:>6}  {precision[i]:>8.4f}  {recall[i]:>8.4f}  {f1[i]:>8.4f}  {int(support[i]):>8d}"
+            f"  Subject-wise acc: mean={subject_accs.mean():.4f}  "
+            f"std={subject_accs.std(ddof=1):.4f}"
         )
-    print(f"  {'macro':>6}  {macro_p:>8.4f}  {macro_r:>8.4f}  {macro_f1:>8.4f}")
-
-    # AUROC (one-vs-rest, pooled across all windows)
-    pooled_y_prob_arr = np.concatenate(pooled_y_prob, axis=0)
-    pooled_y_true_arr = np.array(pooled_y_true, dtype=int)
-    n_classes = pooled_y_prob_arr.shape[1]
-    auroc_per_class: list[float] = []
-    for i in range(n_classes):
-        y_bin = (pooled_y_true_arr == labels[i]).astype(int)
-        if y_bin.sum() == 0 or y_bin.sum() == len(y_bin):
-            auroc_per_class.append(float("nan"))
-        else:
-            auroc_per_class.append(float(roc_auc_score(y_bin, pooled_y_prob_arr[:, i])))
-    if n_classes == 2:
-        macro_auroc = float(roc_auc_score(pooled_y_true_arr, pooled_y_prob_arr[:, 1]))
-    else:
-        macro_auroc = float(
-            roc_auc_score(
-                pooled_y_true_arr,
-                pooled_y_prob_arr,
-                multi_class="ovr",
-                average="macro",
-                labels=labels,
-            )
-        )
-    print(f"\n  AUROC (macro, one-vs-rest): {macro_auroc:.4f}")
-    print("  AUROC per-class: " + ", ".join(f"{a:.3f}" for a in auroc_per_class))
-
-    # ── Write JSON ───────────────────────────────────────────────────────────
-    out_dir = project_root / "main-results" / f"{args.approach}_{args.task}"
-    out_path = args.out_path or (out_dir / f"{args.run_stem}.json")
-    summary = {
-        "approach": args.approach,
-        "task": args.task,
-        "dataset": args.dataset,
-        "run_stem": args.run_stem,
-        "ckpt_root": str(args.ckpt_root),
-        "completed_at": datetime.datetime.now().isoformat(),
-        "n_folds_run": len(fold_results),
-        "n_subjects": n_subjects,
-        "subject_wise": {
-            "mean_acc": float(subject_accs.mean()),
-            "std_acc": float(subject_accs.std(ddof=1)),
-            "min_acc": float(subject_accs.min()),
-            "max_acc": float(subject_accs.max()),
-        },
-        "window_wise_acc": float((np.array(pooled_y_pred) == np.array(pooled_y_true)).mean()),
-        "classification_report": {
-            "labels": [int(x) for x in labels],
-            "confusion_matrix": cm.tolist(),
-            "per_class": {
-                "precision": [round(float(x), 4) for x in precision],
-                "recall": [round(float(x), 4) for x in recall],
-                "f1": [round(float(x), 4) for x in f1],
-                "support": [int(x) for x in support],
-            },
-            "macro": {
-                "precision": round(float(macro_p), 4),
-                "recall": round(float(macro_r), 4),
-                "f1": round(float(macro_f1), 4),
-                "auroc": round(macro_auroc, 4),
-            },
-            "auroc_per_class": [round(a, 4) for a in auroc_per_class],
-        },
-        "per_subject_acc": {str(sid): acc for sid, acc in pooled_per_subject_acc.items()},
-        "per_subject_support": {str(sid): n for sid, n in pooled_per_subject_support.items()},
-        "folds": [
-            {
-                "fold": r["fold"],
-                "val_subjects": r["val_subjects"],
-                "window_acc": r["window_acc"],
-                "macro_subject_acc": r["macro_subject_acc"],
-            }
-            for r in fold_results
-        ],
-    }
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(summary, indent=2))
-    print(f"\nSaved → {out_path}")
-
-    # Also save raw per-window arrays for downstream plotting (ROC, etc.)
-    npz_path = out_path.with_suffix(".npz")
-    np.savez_compressed(
-        npz_path,
-        y_true=np.array(pooled_y_true, dtype=np.int32),
-        y_pred=np.array(pooled_y_pred, dtype=np.int32),
-        y_prob=np.concatenate(pooled_y_prob, axis=0).astype(np.float32),
-        subj_ids=np.array(pooled_subj_ids, dtype=np.int32),
-        labels=np.array(labels, dtype=np.int32),
-    )
-    print(f"Saved → {npz_path}")
+    print(f"\nSaved → {json_path}")
+    print(f"Saved → {json_path.with_suffix('.npz')}")
 
 
 if __name__ == "__main__":
