@@ -23,3 +23,4 @@ runs_srt/
 delftblue
 
 slurm/logs/*
+configs/
