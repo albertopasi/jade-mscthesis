@@ -40,6 +40,7 @@ Use this index as your map. Each entry lists the question the doc answers, so yo
 | Document | Read this when you want to know… |
 |---|---|
 | [`runs_inventory.md`](runs_inventory.md) | …which runs exist, which sweep cell each one belongs to, and which gaps in the matrix are still missing. |
+| [`test_coverage.md`](test_coverage.md) | …which modules are covered by which test file, what each test pins, and what deliberately isn't tested. |
 
 ---
 
