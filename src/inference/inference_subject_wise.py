@@ -256,7 +256,9 @@ def main() -> None:
         fold_preds.append(fp)
 
         macro_subject_acc = (
-            float(np.mean(list(fp.per_subject_acc.values()))) if fp.per_subject_acc else float("nan")
+            float(np.mean(list(fp.per_subject_acc.values())))
+            if fp.per_subject_acc
+            else float("nan")
         )
         print(
             f"[fold {fold_idx}] window_acc={fp.window_acc:.4f}  "

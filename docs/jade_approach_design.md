@@ -269,39 +269,10 @@ Batch size is exposed as the `--batch-size` CLI argument.
 
 ## 9. Hyperparameters
 
-### 9.1 SupCon-Specific Hyperparameters
+The full HP search methodology (staged protocol, sweep grids, selected values per task) lives in [`jade_hp_sweep.md`](jade_hp_sweep.md). Two things are worth pinning here so this doc reads standalone:
 
-| Parameter | CLI flag | Default | Range to sweep | Notes |
-|---|---|---|---|---|
-| $\alpha$ (CE weight) | `--alpha` | 0.5 | [0.3, 0.5, 0.7, 0.8] | Most impactful hyperparameter |
-| $\tau$ (temperature) | `--temperature` | 0.07 | [0.05, 0.07, 0.1] | Lower = harder contrasts |
-| Projection output dim | `--proj-dim` | 128 | [64, 128, 256] | 128 is likely optimal |
-| Projection hidden dim | `--proj-hidden` | 512 | [256, 512] | Match embed_dim |
-| Projection input repr | `--supcon-repr` | `context` | [context, mean, both] | Ablation recommended |
-
-### 9.2 Inherited from FT (unchanged defaults)
-
-| Parameter | LP warmup | FT + SupCon stage |
-|---|---|---|
-| Optimiser | StableAdamW (betas=0.92/0.999, wd=0.01) | Same |
-| LR | 5e-3 | 1e-4 |
-| LR schedule | Exp warmup (3 ep) + ReduceLROnPlateau | Exp warmup (5 ep) + ReduceLROnPlateau |
-| Epochs | 20 max | 200 max |
-| Early stopping | patience=10 (val_acc) | patience=20 |
-| Scheduler patience | 6 | 6 |
-| Grad clip | max_norm=2.0 | max_norm=2.0 |
-| Dropout | 0.05 | 0.1 |
-| Batch size | 64 | 64 |
-| Precision | AMP float16 | AMP float16 |
-| Mixup | Disabled | Disabled |
-
-### 9.3 Priority for Hyperparameter Tuning
-
-1. **$\alpha$** — Controls the balance between objectives. Start with 0.5, sweep [0.3, 0.8].
-2. **$\tau$** — Temperature. Start with 0.07, sweep [0.05, 0.1].
-3. **Batch size** — More positive pairs. Try 128, 256 if memory allows.
-4. **`--supcon-repr`** — Quick ablation: context vs mean vs both.
-5. **Projection dims** — Low priority, defaults are well-justified.
+- **Selected JADE HPs (thesis-final).** 9-class: $\alpha=0.3$, $\tau=0.2$, $B=256$, FT-stage $\text{lr}=4\text{e}{-4}$. Binary: $\alpha=0.2$, $\tau=0.05$, $B=128$, FT-stage $\text{lr}=1\text{e}{-4}$. Both use `--fullft` and `--supcon-repr context`.
+- **All other knobs inherit from the REVE downstream recipe** (StableAdamW, β=0.92/0.999, wd=0.01, AMP fp16, grad-clip 2.0, dropout 0.05 LP / 0.1 FT, projection head 512→128 with ReLU, L2-norm output). Mixup is always disabled under JADE (incompatible with SupCon's positive-pair identification — see §7).
 
 ---
 
@@ -329,7 +300,7 @@ The projection head is **not needed for inference** — classification uses the 
 
 ## 11. W&B Logging
 
-- **Project**: `eeg-sc-v2`, **Entity**: `zl-tudelft-thesis`
+- **Project**: `eeg-jade-v2`, **Entity**: `zl-tudelft-thesis`
 - **Additional metrics** (beyond FT):
   - `train/loss_ce` — CE component of the total loss
   - `train/loss_sc` — SupCon component of the total loss
@@ -355,31 +326,31 @@ Identical to FT (inherited, no changes):
 
 ```bash
 # All folds, FACED, 9-class (LoRA + SupCon, default)
-uv run python -m src.approaches.supcon.train_sc \
+uv run python -m src.approaches.jade.train_jade \
     --dataset faced --task 9-class
 
 # Custom SupCon hyperparameters
-uv run python -m src.approaches.supcon.train_sc \
+uv run python -m src.approaches.jade.train_jade \
     --dataset faced --alpha 0.7 --temperature 0.1
 
 # Different projection head input representation
-uv run python -m src.approaches.supcon.train_sc \
+uv run python -m src.approaches.jade.train_jade \
     --dataset faced --supcon-repr mean
 
 # Full fine-tuning (no LoRA)
-uv run python -m src.approaches.supcon.train_sc --dataset faced --fullft
+uv run python -m src.approaches.jade.train_jade --dataset faced --fullft
 
 # Official REVE static split
-uv run python -m src.approaches.supcon.train_sc --dataset faced --revesplit
+uv run python -m src.approaches.jade.train_jade --dataset faced --revesplit
 
 # Generalization evaluation
-uv run python -m src.approaches.supcon.train_sc --dataset faced --generalization
+uv run python -m src.approaches.jade.train_jade --dataset faced --generalization
 
 # Smoke test
-uv run python -m src.approaches.supcon.train_sc --dataset faced --fold 1 --lp-epochs 2 --ft-epochs 3
+uv run python -m src.approaches.jade.train_jade --dataset faced --fold 1 --lp-epochs 2 --ft-epochs 3
 
 # Larger batch size
-uv run python -m src.approaches.supcon.train_sc --dataset faced --batch-size 128
+uv run python -m src.approaches.jade.train_jade --dataset faced --batch-size 128
 ```
 
 ---

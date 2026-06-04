@@ -1,10 +1,12 @@
-# JADE Hyperparameter Optimization Methodology
+# JADE HP Sweep — Methodology and Results
 
-This document describes the sequential hyperparameter search used to identify
-the JADE training configuration on FACED. It is intended as the reference
-for the methodology section of the thesis. All metrics are 10-fold
-cross-subject CV val_acc × 100 (mean ± std), unless explicitly marked as
-single-fold.
+This document is the reference for the JADE hyperparameter search on FACED.
+It covers the staged search protocol, the sweep tables, and the final
+selected configurations. All metrics are 10-fold cross-subject CV val_acc
+× 100 (mean ± std), unless explicitly marked as single-fold.
+
+For the broader narrative around these numbers see [`results_brief.md`](results_brief.md).
+For the JADE architecture itself see [`jade_approach_design.md`](jade_approach_design.md).
 
 ---
 
@@ -16,13 +18,13 @@ validated by the foundation-model authors on the same downstream
 classification protocol and were not re-tuned in this work.
 
 **Justification.** The point of comparison is the loss formulation
-(CE-only vs CE+SupCon), not the optimization recipe. Using the published
+(CE-only vs CE + SupCon), not the optimization recipe. Using the published
 recipe for the FT-FullFT baseline avoids confounding "tuning effort" with
-"loss design." Where the JADE configuration departs from the REVE recipe
+"loss design". Where the JADE configuration departs from the REVE recipe
 (batch size, learning rate at B=256), the FT-FullFT baseline is re-run with
 the *same* departure for a like-for-like comparison.
 
-**Recipe** (per [REVE]):
+**Recipe** (per REVE):
 - LP stage: 20 epochs, lr=5e-3, StableAdamW, 3-epoch exponential warmup,
   patience=10 on val_acc, dropout=0.05.
 - FT stage: 200 epochs, lr=1e-4, StableAdamW, 5-epoch warmup,
@@ -56,7 +58,8 @@ chosen LR is not an artefact of single-fold variance.
 
 ## 3. Stage 1 — Loss HP grid at REVE default (B=128, lr=1e-4)
 
-### 9-class — full 10-fold CV
+### 3.1 9-class — full 10-fold CV
+
 *FT-FullFT no-mixup baseline = 58.20 ± 3.32.*
 
 Main grid: α ∈ {0.2, 0.3} × τ ∈ {0.03, 0.05, 0.1, 0.2, 0.5}.
@@ -73,7 +76,8 @@ Main grid: α ∈ {0.2, 0.3} × τ ∈ {0.03, 0.05, 0.1, 0.2, 0.5}.
 Optimum is narrow — only this cell exceeds the baseline. SupCon barely
 helps under the default optimization recipe.
 
-### Binary — full 10-fold CV
+### 3.2 Binary — full 10-fold CV
+
 *FT-FullFT no-mixup baseline = 75.55 ± 2.16.*
 
 Main grid: α ∈ {0.2, 0.3} × τ ∈ {0.03, 0.05, 0.1, 0.2, 0.5}.
@@ -113,8 +117,8 @@ verified at full 10-fold CV in §4.4.
 | 4e-4 | 0.6639 / 0.6593 (two runs at the same config) |
 | 8e-4 | 0.6758 |
 
-Run-to-run variance at fixed config (4e-4) is ~1pp on a single fold, so
-fold-1 differences within ~1pp are not interpretable as LR effects.
+Run-to-run variance at fixed config (4e-4) is ~1 pp on a single fold, so
+fold-1 differences within ~1 pp are not interpretable as LR effects.
 **Reliable conclusion: lr=1e-4 is clearly worse; lr ∈ {2e-4, 4e-4, 8e-4}
 form a cluster within fold-1 noise.** Ranking within that cluster
 requires full CV (§4.4).
@@ -137,14 +141,13 @@ candidates at full CV directly.
 
 **Binary Stage 2 winner: B=256, lr=1e-4** (lower LR is better at the larger batch).
 
-The Stage 2 sweep is descriptive: among the LRs tested, lr=1e-4 has the
-highest mean val_acc and lowest std; higher LRs degrade both. The deeper
-observation — that binary did not benefit from batch scaling at all — is
-established by comparing Stage 2 winner (76.74 at B=256) to Stage 1
-winner (77.28 at B=128): the gain is within fold-noise. This contrasts
-with 9-class, which gained ~+3pp from the same batch scaling. The
-discrepancy motivates the positives-per-anchor argument analysed in
-`jade_overall_analysis.md`.
+Among the LRs tested, lr=1e-4 has the highest mean val_acc and lowest std;
+higher LRs degrade both. The deeper observation — that binary did not
+benefit from batch scaling at all — is established by comparing Stage 2
+winner (76.74 at B=256) to Stage 1 winner (77.28 at B=128): the gain is
+within fold-noise. This contrasts with 9-class, which gained ~+3 pp from
+the same batch scaling. The discrepancy is consistent with the
+positives-per-anchor mechanism (see §7).
 
 ### 4.4 9-class — full-CV LR cross-check at the *Stage 3 winner* (α=0.3, τ=0.2)
 
@@ -158,7 +161,7 @@ Stage 3 winning (α, τ) gives the definitive answer:
 | **4e-4** | **62.61** | **3.81** | **winner** |
 | 8e-4 | 57.97 | 7.85 | 2 folds diverged — unstable |
 
-**9-class Stage 2 winner: B=256, lr=4e-4.** lr=4e-4 wins by ≥3.7pp over
+**9-class Stage 2 winner: B=256, lr=4e-4.** lr=4e-4 wins by ≥3.7 pp over
 all alternatives at the Stage 3 (α, τ). The fold-1 ranking that placed
 lr=2e-4 highest among non-8e-4 candidates was within run-to-run noise
 and is not reproduced at full CV.
@@ -171,7 +174,7 @@ Stage 3 sweeps a plus-shaped grid around the Stage 1 winner at the
 Stage 2 optimization recipe — α-axis at the working τ and τ-axis at the
 working α.
 
-### 9-class @ B=256, lr=4e-4 — complete 3 × 4 grid
+### 5.1 9-class @ B=256, lr=4e-4 — complete 3 × 4 grid
 
 | α \ τ | 0.05 | 0.1 | 0.2 | 0.5 |
 |:---:|:---:|:---:|:---:|:---:|
@@ -191,10 +194,10 @@ The complete grid confirms this is a local maximum:
 
 - **α-axis at the winning τ=0.2**: 58.08 (α=0.2) → **62.61** (α=0.3) → 61.62 (α=0.5). Smooth peak.
 - **τ-axis at the winning α=0.3**: 61.90 → 62.34 → **62.61** → 60.79. Smooth peak.
-- **α=0.5 row**: 61.16 → 61.38 → 61.62 → 60.14. A flat plateau ~1pp below the winner — α=0.5 is consistently sub-optimal at every τ.
+- **α=0.5 row**: 61.16 → 61.38 → 61.62 → 60.14. A flat plateau ~1 pp below the winner — α=0.5 is consistently sub-optimal at every τ.
 - **α=0.2 row**: irregular (60.89 → 60.76 → 58.08 → 61.21) with high std at τ ∈ {0.1, 0.2} (6.74, 6.97). Suggests training instability when SupCon dominates strongly enough (low α) at moderate τ. Not a competitive regime.
 
-### Binary @ B=256, lr=1e-4 — complete 3 × 5 grid
+### 5.2 Binary @ B=256, lr=1e-4 — complete 3 × 5 grid
 
 | α \ τ | 0.03 | 0.05 | 0.1 | 0.2 | 0.5 |
 |:---:|:---:|:---:|:---:|:---:|:---:|
@@ -207,22 +210,20 @@ cells reach the ~77.3 region — (α=0.3, τ=0.03) → 77.33 and (α=0.5, τ=0.5
 → 77.36 — at opposite corners of the grid, with no monotonic gradient
 connecting them. The α=0.5/τ=0.5 cell has the highest std (3.32) of any
 binary cell tested; the α=0.3/τ=0.03 cell is more stable (std 2.49). The
-remaining 13 cells sit between 75.4 and 76.7 — all within ~2pp of the
+remaining 13 cells sit between 75.4 and 76.7 — all within ~2 pp of the
 plateau, all within fold-noise of one another.
 
 This pattern is a finding in itself: under B=256 the binary loss
 landscape **has no clear (α, τ) optimum** — multiple disconnected cells
 reach the same accuracy, and no axis carves out a coherent maximum. The
-B=128 sweep, by contrast (§3 binary table), had a cleaner peak at
-α=0.2, τ=0.05 with lower variance and a smoother surrounding region.
+B=128 sweep, by contrast (§3.2), had a cleaner peak at α=0.2, τ=0.05
+with lower variance and a smoother surrounding region.
 
-**Stage 3 winner (binary): α=0.3, τ=0.03, B=256, lr=1e-4 → 77.33 (Δ=+0.11 vs FT B=256 baseline 77.22).**
+**Stage 3 winner candidate (binary @ B=256): α=0.3, τ=0.03 → 77.33 (Δ=+0.11 vs FT B=256 baseline 77.22).**
 
-α shifted from 0.2 (Stage 1) to 0.3 at the new recipe. The plus-shape
-confirms this is a local maximum: τ-axis at α=0.3 → {77.33, 75.95, 76.58, 76.22, 76.36}; α-axis at τ=0.03 → {76.71, **77.33**, 76.48}.
-The accuracy gain over the matched FT baseline (77.22) is well within
-fold-noise. **Binary's SupCon contribution is essentially negligible
-once the FT baseline is properly tuned.**
+The accuracy gain over the matched FT B=256 baseline (77.22) is well
+within fold-noise. **Binary's SupCon contribution is essentially
+negligible once the FT baseline is properly tuned.**
 
 ---
 
@@ -232,6 +233,17 @@ once the FT baseline is properly tuned.**
 |---|---|:---:|:---:|:---:|:---:|
 | 9-class | α=0.3, τ=0.2, B=256, lr=4e-4 | **62.61** | 3.81 | 58.91 (B=256, lr=4e-4) | **+3.70** |
 | Binary  | α=0.2, τ=0.05, **B=128**, lr=1e-4 | **77.28** | **1.29** | 75.55 (B=128, lr=1e-4) | **+1.73** |
+
+> Note on the binary number. The +1.73 pp gain is against the
+> FT-FullFT baseline at the REVE default recipe (B=128, lr=1e-4) — the
+> matched-recipe comparison. When the FT baseline is itself re-tuned at
+> B=256 (lr=2e-4 yields 77.22 ± 1.21, see §4.3), JADE's binary edge
+> shrinks to **+0.11** (77.33 − 77.22), within fold-noise. Both numbers
+> are reported transparently; the +1.73 figure is the recipe-matched
+> comparison, and the +0.11 figure is the further control showing the
+> binary win is essentially attributable to the optimization recipe,
+> not the loss formulation. The 9-class +3.70 pp result persists under
+> the same FT re-tuning.
 
 ### 6.1 Why the binary winner is B=128 (not B=256)
 
@@ -264,74 +276,52 @@ preferred for the following reasons:
    (binary's "no scaling needed" narrative becomes "we used the same
    recipe but it did not help"), losing the mechanistic story.
 
-4. **Robustness under verification.** The B=256 binary recipe was
-   tested at lr ∈ {1e-4, 2e-4, 4e-4, 8e-4} (§4.3); none improved over
-   the B=128 result, and lr ∈ {4e-4, 8e-4} actively degraded
-   performance. With the **complete 3 × 5 grid** at lr=1e-4 now in hand
-   (§5), two cells reach ~77.3 — (α=0.3, τ=0.03) → 77.33 and (α=0.5,
-   τ=0.5) → 77.36 — at opposite ends of the grid with no smooth
-   trajectory between them; the remaining 13 cells sit ~1–2 pp below.
-   Under B=256 the binary loss landscape is **flat with multiple
-   disconnected local plateaux at ~77 pp**, none distinguishable from
-   the B=128 winner (77.28 ± 1.29). Under B=128, by contrast, the
-   landscape has a cleaner peak (α=0.2, τ=0.05) with surrounding cells
-   smoothly degrading. The B=256 grid does not surface a meaningful
-   improvement; it surfaces noise. This is direct evidence that
-   B=256 is not a net improvement for binary, beyond the per-cell
-   accuracy comparisons.
+4. **Robustness under verification.** Under B=256 the binary loss
+   landscape is **flat with multiple disconnected local plateaux at
+   ~77 pp**, none distinguishable from the B=128 winner
+   (77.28 ± 1.29). Under B=128, by contrast, the landscape has a
+   cleaner peak (α=0.2, τ=0.05) with surrounding cells smoothly
+   degrading. The B=256 grid does not surface a meaningful improvement;
+   it surfaces noise.
 
-The B=256 binary plus-shape data is retained in §5 as control
+The B=256 binary plus-shape data in §5.2 is retained as control
 evidence: it is the experimental record that batch scaling, properly
 explored across a 3 × 5 (α, τ) grid and four LRs, does *not* yield a
-binary improvement. Without it, a reviewer could ask "did you actually
-test scaling for binary?" and our answer would be insufficient.
-
-### 6.2 Note on baseline parity for the binary Δ
-
-The binary Δ = +1.73 above is reported against the FT-FullFT no-mixup
-baseline at the REVE default recipe (B=128, lr=1e-4). This baseline
-was *not* itself LR-tuned — it inherits lr=1e-4 from the published
-recipe. When the FT-FullFT baseline is re-tuned at B=256
-(`§4.3` shows lr=2e-4 yields 77.22 ± 1.21), JADE's binary edge over a
-fully-tuned CE baseline shrinks to **+0.11** (77.33 − 77.22) — within
-fold-noise. Both numbers are reported transparently in
-`docs/jade_vs_ft_results.md` and discussed in
-`docs/jade_overall_analysis.md`. The thesis presents the +1.73 figure
-as the recipe-matched comparison (both methods at REVE default) and
-the +0.11 figure as the further control showing that the binary win
-is essentially attributable to the optimization recipe, not the loss
-formulation. The 9-class +3.70 result, by contrast, persists under
-the same FT re-tuning.
+binary improvement.
 
 ---
 
-## 7. Methodological notes for the thesis
+## 7. Methodological notes
 
-- **Single-fold use is bounded and verified.** Only Stage 2.2 (9-class
-  LR direction-finding) used fold-1 metrics; the chosen LR was verified
-  at full 10-fold CV in §4.4 and decisively confirmed (4e-4 winner by
-  ≥3.7pp).
+- **Single-fold use is bounded and verified.** Only Stage 2 (9-class
+  LR direction-finding, §4.2) used fold-1 metrics; the chosen LR was
+  verified at full 10-fold CV in §4.4 and decisively confirmed
+  (4e-4 winner by ≥ 3.7 pp).
 - **The plus-shape grid is the rigorous compromise** between full joint
   sweep and pure coordinate descent. Each axis around the winner has at
   least 3 cells; α-extremes are also covered as Stage 1 ablation.
 - **Per-task optima differ across all three HPs.** This is a finding,
-  not a bookkeeping inconvenience — see `jade_overall_analysis.md` for
-  the positives-per-anchor argument.
+  not a bookkeeping inconvenience — the
+  positives-per-anchor argument: 9-class is positives-starved at B=128
+  (~14 same-class anchors per batch) and benefits from scaling to B=256
+  (~28); binary is already saturated at B=128 (~64 per anchor) and does
+  not.
 - **All FT-FullFT baselines are re-run when the optimization recipe
   changes.** Tables in this document compare JADE to the FT baseline at
-  the *same* batch+lr, never against a fixed reference baseline that uses
-  a different recipe.
-- **τ-shift across stages is consistent with mechanism.** Binary τ
-  decreases (0.05 → 0.03) at the larger batch — sharper loss when
-  many positives per anchor (~64 → ~128). 9-class τ increases (0.1 →
-  0.2) — softer loss when the contrastive estimator is now denser
-  but still moderate (~14 → ~28 positives).
+  the *same* batch+lr, never against a fixed reference baseline that
+  uses a different recipe.
+- **τ-shift across stages is consistent with mechanism.** 9-class τ
+  increases (0.1 → 0.2) at the larger batch — softer loss when the
+  contrastive estimator is denser. Binary τ would similarly decrease
+  (0.05 → 0.03) at B=256, but B=256 itself is not the chosen recipe
+  for binary, so the Stage 1 (B=128, τ=0.05) winner stands.
 
 ---
 
-## 8. Coverage status
+## 8. Sweep coverage
 
 All cells in §3 (Stage 1) and §5 (Stage 3) are filled at full 10-fold CV:
+
 - **Stage 1 9-class**: 2 × 5 main grid + 5-cell α-extreme ablation — complete.
 - **Stage 1 binary**: 2 × 5 main grid + 5-cell α-extreme ablation — complete.
 - **Stage 3 9-class**: full 3 × 4 grid at B=256, lr=4e-4 — complete.
@@ -339,8 +329,5 @@ All cells in §3 (Stage 1) and §5 (Stage 3) are filled at full 10-fold CV:
 - **LR cross-checks** (§4.4): full CV at lr ∈ {1e-4, 2e-4, 4e-4, 8e-4}
   for 9-class at the Stage 3 winner — complete.
 
-**Pending (binary low-LR sanity checks, in flight)**: lr=5e-5 at the
-B=128 winner (α=0.2, τ=0.05) and at the B=256 winner (α=0.3, τ=0.03).
-These verify that lr=1e-4 is not dominated by smaller LR at either
-batch size. Results expected to confirm the chosen LR; will be added
-to §4 once available.
+For the inventory of every run produced during this search and which
+sweep cell it corresponds to, see [`runs_inventory.md`](runs_inventory.md).

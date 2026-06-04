@@ -42,9 +42,7 @@ def _pooled_macro_auroc(
             macro = float(roc_auc_score(y_true, y_prob[:, 1]))
         else:
             macro = float(
-                roc_auc_score(
-                    y_true, y_prob, multi_class="ovr", average="macro", labels=labels
-                )
+                roc_auc_score(y_true, y_prob, multi_class="ovr", average="macro", labels=labels)
             )
     except ValueError:
         macro = float("nan")
@@ -80,7 +78,9 @@ def _build_summary_dict(
     )
     macro_auroc, auroc_per_class = _pooled_macro_auroc(pooled_y_true, pooled_y_prob, labels)
 
-    window_acc = float((pooled_y_pred == pooled_y_true).mean()) if len(pooled_y_true) else float("nan")
+    window_acc = (
+        float((pooled_y_pred == pooled_y_true).mean()) if len(pooled_y_true) else float("nan")
+    )
 
     summary: dict = {
         "approach": approach,

@@ -273,7 +273,9 @@ def run_fold_ft(
         fold_predictions.val_stimuli = sorted(val_stimuli) if val_stimuli is not None else None
         n_subj = len(fold_predictions.per_subject_acc)
         macro_subj = (
-            float(sum(fold_predictions.per_subject_acc.values()) / n_subj) if n_subj else float("nan")
+            float(sum(fold_predictions.per_subject_acc.values()) / n_subj)
+            if n_subj
+            else float("nan")
         )
         print(
             f"  window_acc={fold_predictions.window_acc:.4f}  "

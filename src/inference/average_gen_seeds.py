@@ -161,7 +161,9 @@ def main() -> None:
     # Pool per-window predictions across seeds for the macro report.
     y_true = np.concatenate([npz["y_true"] for npz in seed_npzs.values()]).astype(np.int32)
     y_pred = np.concatenate([npz["y_pred"] for npz in seed_npzs.values()]).astype(np.int32)
-    y_prob = np.concatenate([npz["y_prob"] for npz in seed_npzs.values()], axis=0).astype(np.float32)
+    y_prob = np.concatenate([npz["y_prob"] for npz in seed_npzs.values()], axis=0).astype(
+        np.float32
+    )
     subj_ids = np.concatenate([npz["subj_ids"] for npz in seed_npzs.values()]).astype(np.int32)
     stim_ids = np.concatenate([npz["stim_ids"] for npz in seed_npzs.values()]).astype(np.int32)
 
@@ -249,8 +251,10 @@ def main() -> None:
         labels=np.array(labels, dtype=np.int32),
     )
 
-    print(f"\nN subjects: {n_subjects}  |  seeds per subject: "
-          f"min={min(n_seeds_per_subject.values())} max={max(n_seeds_per_subject.values())}")
+    print(
+        f"\nN subjects: {n_subjects}  |  seeds per subject: "
+        f"min={min(n_seeds_per_subject.values())} max={max(n_seeds_per_subject.values())}"
+    )
     print(f"Subject-wise: mean={accs_arr.mean():.4f}  std={accs_arr.std(ddof=1):.4f}")
     print(f"\nSaved → {json_path}")
     print(f"Saved → {npz_path}")

@@ -30,7 +30,7 @@ extracted directly from the JSON summaries committed to `main-results/`.
     contrastive loss of Khosla et al. (2020). A projection head (used only at
     training time for the contrastive loss) sits on top of the encoder.
 - **Hyperparameters of the reported JADE configurations** (selected from full
-  sweep, see `docs/jade_hp_methodology.md`):
+  sweep, see `docs/jade_hp_sweep.md`):
   - 9-class: α=0.3, τ=0.2, batch=256, lr=4e-4, SupCon repr = "context".
   - Binary:  α=0.2, τ=0.05, batch=128, lr=1e-4, SupCon repr = "context".
   - The matching SFT baseline was re-run at the *same* batch/LR recipe so the

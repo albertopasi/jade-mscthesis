@@ -113,6 +113,182 @@ def bca_bootstrap_ci(
     return float(res.confidence_interval.low), float(res.confidence_interval.high)
 
 
+@dataclass
+class FriedmanResult:
+    """Result of a Friedman omnibus test across k repeated measures on n blocks."""
+
+    labels: list[str]
+    n: int  # number of blocks (subjects)
+    k: int  # number of conditions (methods)
+    stat: float  # chi-squared statistic
+    df: int  # degrees of freedom = k - 1
+    pval: float
+    kendall_w: float  # Kendall's W effect size in [0, 1]
+    mean_ranks: dict[str, float]  # average rank per condition (lower = better)
+
+
+def run_friedman(vectors: dict[str, np.ndarray]) -> FriedmanResult:
+    """Friedman rank test across k repeated measures (same n subjects).
+
+    H0: the k conditions have identical rank distributions across blocks.
+    Non-parametric, no normality assumption. Multi-condition extension of
+    the Wilcoxon signed-rank test.
+
+    Args:
+        vectors: ordered dict mapping condition label -> length-n accuracy vector.
+                 All vectors must be the same length and aligned by subject.
+
+    Returns:
+        FriedmanResult with the chi-squared statistic, p-value, Kendall's W
+        effect size, and per-condition mean ranks.
+    """
+    labels = list(vectors.keys())
+    arrays = [vectors[lbl] for lbl in labels]
+    lengths = {len(a) for a in arrays}
+    if len(lengths) != 1:
+        raise ValueError(f"Friedman requires equal-length vectors; got lengths {lengths}")
+    n = lengths.pop()
+    k = len(arrays)
+    if k < 3:
+        raise ValueError(f"Friedman requires k >= 3 conditions; got k={k}")
+
+    res = stats.friedmanchisquare(*arrays)
+    stat = float(res.statistic)
+    pval = float(res.pvalue)
+
+    # Kendall's W = chi^2 / (n * (k - 1)) — effect size in [0, 1].
+    # 0 = no agreement among blocks on ranking, 1 = perfect agreement.
+    kendall_w = stat / (n * (k - 1))
+
+    # Mean rank per condition (rank 1 = lowest accuracy on that subject).
+    # Compute per-block ranks (averaging ties) and average across blocks.
+    stacked = np.column_stack(arrays)  # (n, k)
+    ranks = np.apply_along_axis(stats.rankdata, axis=1, arr=stacked)  # (n, k)
+    mean_ranks_arr = ranks.mean(axis=0)  # (k,)
+    mean_ranks = {lbl: float(mean_ranks_arr[i]) for i, lbl in enumerate(labels)}
+
+    return FriedmanResult(
+        labels=labels,
+        n=n,
+        k=k,
+        stat=stat,
+        df=k - 1,
+        pval=pval,
+        kendall_w=float(kendall_w),
+        mean_ranks=mean_ranks,
+    )
+
+
+def run_brown_forsythe_friedman(vectors: dict[str, np.ndarray]) -> FriedmanResult:
+    """Brown-Forsythe-style omnibus test for equality of dispersion (paired).
+
+    Standard within-subject test for whether the methods have different
+    subject-level spread. Procedure:
+
+      1. For each method m, replace each accuracy a_i^(m) with its absolute
+         deviation from the method's median: d_i^(m) = |a_i^(m) - median(a^(m))|.
+         Using the median (not the mean) is what makes this "Brown-Forsythe"
+         and gives robustness to outliers.
+      2. Run Friedman on the transformed vectors d^(m), with subjects as
+         blocks and methods as conditions.
+
+    H0: median absolute deviation is equal across methods.
+
+    Pairing is preserved through the Friedman block structure (each subject
+    contributes one d value per method), so this is the correct paired-design
+    test of dispersion equality. No normality assumption.
+
+    Returns the same FriedmanResult dataclass as run_friedman, but operating
+    on absolute deviations instead of raw accuracies. mean_ranks here describe
+    where each method sits in the ranking of *spread* per subject (higher
+    rank = larger deviation from that method's median for that subject).
+    """
+    transformed: dict[str, np.ndarray] = {}
+    for label, vec in vectors.items():
+        med = float(np.median(vec))
+        transformed[label] = np.abs(vec - med)
+    return run_friedman(transformed)
+
+
+def bca_variance_ratio_ci(
+    a: np.ndarray,
+    b: np.ndarray,
+    seed: int,
+    n_boot: int,
+    alpha: float = 0.05,
+) -> tuple[float, float, float]:
+    """Paired BCa bootstrap CI on the variance ratio Var(a) / Var(b).
+
+    Resamples subject indices with replacement (preserving pairing — both
+    methods at subject i are kept together), recomputes the ratio on each
+    resample. Asymmetric distribution (bounded below at 0), so BCa correction
+    is more appropriate than plain percentile.
+
+    Returns (point_estimate, ci_lo, ci_hi) — the observed ratio and the
+    BCa-corrected 95% CI bounds.
+
+    CI excluding 1.0 = the variances differ significantly at level alpha.
+    """
+    if a.shape != b.shape:
+        raise ValueError(f"a and b must have the same length; got {a.shape} vs {b.shape}")
+
+    def _ratio(idx: np.ndarray) -> float:
+        va = float(np.var(a[idx], ddof=1))
+        vb = float(np.var(b[idx], ddof=1))
+        if vb == 0:
+            return float("nan")
+        return va / vb
+
+    n = len(a)
+    rng = np.random.default_rng(seed)
+
+    # Paired bootstrap on subject indices.
+    idx_matrix = rng.integers(0, n, size=(n_boot, n))
+    boot = np.array([_ratio(idx_matrix[k]) for k in range(n_boot)], dtype=float)
+    boot = boot[np.isfinite(boot)]
+    if len(boot) == 0:
+        return float("nan"), float("nan"), float("nan")
+
+    observed = _ratio(np.arange(n))
+
+    # BCa correction — same shape as in scipy's bootstrap implementation.
+    # z0 = Phi^{-1}(fraction of boot replicates below observed).
+    frac_below = float((boot < observed).sum() + 0.5 * (boot == observed).sum()) / len(boot)
+    frac_below = min(max(frac_below, 1e-12), 1 - 1e-12)  # clamp for ppf
+    z0 = float(stats.norm.ppf(frac_below))
+
+    # Acceleration via jackknife on subjects.
+    jack: list[float] = []
+    full_idx = np.arange(n)
+    for i in range(n):
+        leave_out = np.delete(full_idx, i)
+        jack.append(_ratio(leave_out))
+    jack = np.array(jack, dtype=float)
+    jack = jack[np.isfinite(jack)]
+    if len(jack) < 3:
+        # Fall back to plain percentile if jackknife degenerates.
+        lo = float(np.percentile(boot, 100 * alpha / 2))
+        hi = float(np.percentile(boot, 100 * (1 - alpha / 2)))
+        return observed, lo, hi
+
+    jack_mean = jack.mean()
+    num = float(np.sum((jack_mean - jack) ** 3))
+    den = 6.0 * (float(np.sum((jack_mean - jack) ** 2)) ** 1.5)
+    accel = num / den if den > 0 else 0.0
+
+    z_lo = float(stats.norm.ppf(alpha / 2))
+    z_hi = float(stats.norm.ppf(1 - alpha / 2))
+    a1 = float(stats.norm.cdf(z0 + (z0 + z_lo) / (1 - accel * (z0 + z_lo))))
+    a2 = float(stats.norm.cdf(z0 + (z0 + z_hi) / (1 - accel * (z0 + z_hi))))
+    # Clamp the corrected percentiles to [0, 1] for safety.
+    a1 = min(max(a1, 0.0), 1.0)
+    a2 = min(max(a2, 0.0), 1.0)
+
+    lo = float(np.percentile(boot, 100 * a1))
+    hi = float(np.percentile(boot, 100 * a2))
+    return observed, lo, hi
+
+
 def percentile_bootstrap_ci(
     d: np.ndarray, seed: int, n_boot: int, alpha: float = 0.05
 ) -> tuple[float, float]:
@@ -363,30 +539,34 @@ def main() -> None:
     L.append("does **not** describe how precisely you know the mean. For that, see §0.4.")
     L.append("")
 
-    L.append("### 0.4 BCa bootstrap 95 % confidence interval on the mean accuracy")
+    L.append("### 0.4 BCa bootstrap 95 % CI on the mean accuracy")
     L.append("")
     L.append("**What it is.** A 95 % CI is an interval that, under repeated sampling,")
     L.append("contains the true mean accuracy 95 % of the time. Narrow CI = mean is")
     L.append("estimated precisely; wide CI = mean is uncertain.")
     L.append("")
-    L.append("**Why BCa specifically.** We use the **bias-corrected and accelerated**")
-    L.append("bootstrap (Efron 1987) as implemented in `scipy.stats.bootstrap`. BCa")
-    L.append("adjusts for two distinct distortions that a plain percentile bootstrap")
-    L.append("ignores: *bias* (the bootstrap distribution may be systematically shifted")
-    L.append("relative to the true sampling distribution) and *acceleration* (the")
-    L.append("standard error of the statistic may itself depend on the underlying")
-    L.append("value). For a mean of bounded-interval accuracies near 0.5–0.8, both")
-    L.append("corrections are small but non-zero; BCa is the textbook-recommended")
-    L.append("default unless there is a reason not to use it.")
+    L.append("**Procedure.** From the 123 subject accuracies, draw 123 with replacement")
+    L.append(f"and take the mean; repeat {BOOTSTRAP_N:,} times (seed = {BOOTSTRAP_SEED})")
+    L.append("to build an empirical sampling distribution of the mean. The 95 % CI is")
+    L.append("then read off two percentiles of that distribution.")
     L.append("")
-    L.append("**Procedure.**")
+    L.append("**Two flavours, why BCa here.**")
     L.append("")
-    L.append("1. From the 123 subject accuracies, draw 123 samples *with replacement*.")
-    L.append("2. Compute the mean of this resample.")
-    L.append(f"3. Repeat {BOOTSTRAP_N:,} times (seed = {BOOTSTRAP_SEED}).")
-    L.append("4. Apply the BCa correction (bias estimated from the proportion of")
-    L.append("   resamples below the observed statistic; acceleration estimated via")
-    L.append("   jackknife). The corrected percentiles form the 95 % CI.")
+    L.append("- *Percentile* (simplest): take the raw 2.5th and 97.5th percentiles.")
+    L.append("  Implicitly assumes the bootstrap distribution is unbiased and symmetric.")
+    L.append("- *BCa* — bias-corrected and accelerated (Efron 1987), used here via")
+    L.append('  `scipy.stats.bootstrap(..., method="BCa")`. Shifts the percentiles to')
+    L.append("  correct for two distortions: **bias** (the bootstrap distribution may be")
+    L.append("  off-centre relative to the true sampling distribution; estimated from the")
+    L.append("  fraction of resamples below the observed mean) and **acceleration** (the")
+    L.append("  standard error may itself vary with the underlying value, i.e. skew;")
+    L.append("  estimated via jackknife).")
+    L.append("")
+    L.append("When the distribution is symmetric and unbiased, both methods give the")
+    L.append("same interval. When it is skewed, BCa shifts the CI to be more honest about")
+    L.append("where the true sampling distribution lies. For bounded accuracies near")
+    L.append("0.5–0.8 the BCa corrections are small but non-zero; BCa is the")
+    L.append("textbook-recommended default and costs nothing extra at this sample size.")
     L.append("")
     L.append('**Intuitively.** *"If I were to repeat this entire study with a different')
     L.append("set of 123 subjects drawn from the same population, where would the mean")
@@ -500,14 +680,17 @@ def main() -> None:
     L.append("**t-based CI** (parametric). Assumes the paired differences are")
     L.append("approximately normal. Formula in §0.6.")
     L.append("")
-    L.append("**Percentile bootstrap CI** (non-parametric). Resample the 123 paired")
-    L.append(f"differences with replacement {BOOTSTRAP_N:,} times, compute the mean each")
-    L.append("time, take the 2.5th / 97.5th percentiles. No distributional assumption.")
+    L.append("**Percentile bootstrap CI** (non-parametric). Same resampling procedure")
+    L.append("as in §0.4, but applied to the paired-difference vector `d` rather than")
+    L.append("to the raw accuracy vector — and taking the raw 2.5th / 97.5th percentiles")
+    L.append("without the BCa correction. No distributional assumption.")
     L.append("")
     L.append("**Reading the table.** When the two CIs agree to within rounding, the")
     L.append("t-distribution is a good fit and either interval is fine to quote in")
     L.append("the report. When they disagree, prefer the bootstrap interval — it is")
-    L.append("assumption-free.")
+    L.append("assumption-free. (BCa would be the more rigorous choice for the paired-")
+    L.append("difference distribution too; we report the plain percentile interval for")
+    L.append("now and treat the gap as a known minor methodological inconsistency.)")
     L.append("")
 
     L.append("### 0.11 Holm-Bonferroni correction (multiple comparisons)")

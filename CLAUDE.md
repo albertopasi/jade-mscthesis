@@ -4,32 +4,42 @@ MSc thesis project: reproduce and extend REVE for emotion recognition on EEG. Or
 
 ## Thesis status (current)
 
-**Operative plan**: see `docs/thesis_plan.md`. Methodology details: `docs/jade_hp_methodology.md`. Discussion of findings: `docs/jade_overall_analysis.md`. Raw results tables: `docs/jade_vs_ft_results.md`.
+**Thesis done.** The report PDF is at `MASTER_THESIS_REPORT(2).pdf`. The headline result is a new SOTA on FACED under standard 10-fold cross-subject CV: **JADE 76.32 % binary, 62.03 % 9-class** (vs prior best CL-CS at 72.5 / 43.4). Two findings:
 
-**Scope decision**: FACED-deep-dive thesis, with two main axes — JADE-FullFT HP optimization and LoRA-vs-FullFT comparison. Generalization (stimulus-held-out) splits validate JADE within FACED. THU-EP is a secondary "cross-dataset transfer" finding (executed, reported as limitation, not investigated further).
+1. **RQ1 — Frozen REVE + linear probe already matches or beats SOTA contrastive cross-subject frameworks** (LP > CL-CS by +6.87 pp on 9-class, parity on binary). Subject-invariance is inherited from large-scale pretraining; not learned from FACED.
+2. **RQ2 — JADE (joint CE + SupCon) significantly improves over SFT on 9-class** (+3.51 pp, Wilcoxon Holm-adjusted p = 4.4e−10). Binary gain is +0.80 pp and *not* significant (p = 0.080) — the task is too coarse for label-aware SupCon to help.
 
-**Current best JADE-FullFT configs on FACED** (subject to bulletproof-sweep results):
-- 9-class: `α=0.3, τ=0.2, B=256, ft_lr=4e-4` → 62.61 ± 3.81 (Δ=+3.70 vs FT-FullFT B=256 baseline)
-- Binary: `α=0.3, τ=0.03, B=256, ft_lr=1e-4` → 77.33 ± 2.49 (Δ=+0.11 vs FT-FullFT B=256 baseline)
+**Final JADE configs on FACED (thesis Table 6.1):**
+- 9-class: `α=0.3, τ=0.2, B=256, ft_lr=4e-4, fullft` → **62.03 ± 14.70**
+- Binary: `α=0.2, τ=0.05, B=128, ft_lr=1e-4, fullft` → **76.32 ± 8.12**
 
-**Key narrative finding**: SupCon's value is task-conditional. 9-class (positives-starved at default B=128) gains ~+3.7pp at B=256. Binary (already saturated) gains nothing once the FT baseline is properly LR-tuned.
+These are the configs you'll see referenced everywhere; their JSONs live under `main-results/jade_{9-class,binary}/`.
 
-**Sweeps in-flight (do not duplicate)**:
-- `slurm/run_jade_bulletproof.sh` — 12 jobs filling Stage 1/3 grid holes + LR cross-checks for FACED.
-- `slurm/run_lr_holes.sh` — 1 job verifying lr=2e-4 for 9-class at full CV.
-- `slurm/run_faced_generalization.sh` — 4 jobs, 3 seeds × 10 folds each, stimulus-generalization on FACED.
+**Scope decision**: FACED-only thesis. THU-EP was preprocessed and explored as a cross-dataset transfer sanity check but is not part of the main results, statistical tests, or generalization analysis. The README, statistical_tests outputs, and reproduction docs deliberately exclude THU-EP references.
 
-**Planned next**: 4 LoRA jobs (FT-LoRA × {9-class, binary} + JADE-LoRA × {9-class, binary}) at the bulletproof-sweep winners. Not yet submitted.
+**Stimulus-generalization (held-out subjects × held-out stimuli)**:
+- Binary: ~59 % under all three methods (above 50 % chance), no significant ordering.
+- 9-class: ~16 % under all three methods (near 11 % chance — task collapses).
+- This is reported as a limitation, not solved.
 
-**Important methodological norm**: when a JADE config departs from the REVE recipe (B=256, scaled LR), the FT-FullFT baseline must be re-run at the *same* recipe for a fair comparison. Never compare JADE@(new recipe) to FT@(old recipe).
+**Generalization data status (current snapshot — check `main-results/*_generalization/` for ground truth):**
+- JADE 9-class, JADE binary, FT 9-class, FT binary, LP 9-class: per-seed JSONs (123, 789) + `_gen_avg.json` written.
+- LP binary: per-seed runs pending. The `statistical_tests_generalization.py` driver gracefully degrades to k=2 (Wilcoxon) for binary until LP binary lands.
+
+**Important methodological norm (do not break)**: when a JADE config departs from the REVE recipe (e.g. B=256 with scaled LR), the SFT baseline **must** be re-run at the *same* recipe. Never compare JADE@(new recipe) to SFT@(old recipe). The thesis HP protocol is built around this; see `docs/jade_hp_sweep.md`.
 
 **HP tuning insights worth remembering**:
-- The original "binary +1.73pp SupCon win" was inflated by an under-tuned FT baseline. After tuning FT at lr=2e-4 B=256, the gap shrinks to +0.11.
-- Single-fold val_acc has ~1pp run-to-run variance. Single-fold rankings within ~1pp are *not* interpretable as HP effects; full 10-fold CV is required for any conclusion.
+- Single-fold val_acc has ~1 pp run-to-run variance. Single-fold rankings within ~1 pp are *not* interpretable as HP effects; full 10-fold CV is required for any conclusion.
 - LR=8e-4 on 9-class gave the highest fold-1 val_acc but had cross-fold instability (training divergence on individual folds). Rejected for stability, not absolute accuracy.
 - B=512 OOMs on A100-80GB; B=256 fits at ~62 GB peak.
 
-**File-naming convention** (already implemented in JADE and FT pipelines): summary JSON / checkpoint dir / W&B run name include `_b{batch}_lr{ft_lr:g}` so different recipes don't collide.
+**Run-name convention** (in `config.run_name_stem()` for all three approaches): summary JSON / checkpoint dir / W&B run name encode every distinguishing HP (`_b{batch}_lr{ft_lr:g}_{fullft|r{rank}}{_gen_s{seed}}`). Different recipes never collide on disk. If you add a new HP that distinguishes sweep cells, encode it in `run_name_stem` — otherwise two runs silently overwrite each other.
+
+**Where to read next:**
+- `README.md` — orientation + main results table + figures
+- `docs/README.md` — annotated index over `docs/`
+- `docs/architecture.md` — code design (training pipelines, inference contract, conventions)
+- `docs/reproducing_results.md` — exact commands for every thesis result
 
 ## Always use `uv run python` to run anything (not plain `python`)
 

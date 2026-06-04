@@ -51,30 +51,34 @@ variability** of EEG.
 **Important caveat.** `mean ± std` describes the *spread of subjects*; it
 does **not** describe how precisely you know the mean. For that, see §0.4.
 
-### 0.4 BCa bootstrap 95 % confidence interval on the mean accuracy
+### 0.4 BCa bootstrap 95 % CI on the mean accuracy
 
 **What it is.** A 95 % CI is an interval that, under repeated sampling,
 contains the true mean accuracy 95 % of the time. Narrow CI = mean is
 estimated precisely; wide CI = mean is uncertain.
 
-**Why BCa specifically.** We use the **bias-corrected and accelerated**
-bootstrap (Efron 1987) as implemented in `scipy.stats.bootstrap`. BCa
-adjusts for two distinct distortions that a plain percentile bootstrap
-ignores: *bias* (the bootstrap distribution may be systematically shifted
-relative to the true sampling distribution) and *acceleration* (the
-standard error of the statistic may itself depend on the underlying
-value). For a mean of bounded-interval accuracies near 0.5–0.8, both
-corrections are small but non-zero; BCa is the textbook-recommended
-default unless there is a reason not to use it.
+**Procedure.** From the 123 subject accuracies, draw 123 with replacement
+and take the mean; repeat 10,000 times (seed = 42)
+to build an empirical sampling distribution of the mean. The 95 % CI is
+then read off two percentiles of that distribution.
 
-**Procedure.**
+**Two flavours, why BCa here.**
 
-1. From the 123 subject accuracies, draw 123 samples *with replacement*.
-2. Compute the mean of this resample.
-3. Repeat 10,000 times (seed = 42).
-4. Apply the BCa correction (bias estimated from the proportion of
-   resamples below the observed statistic; acceleration estimated via
-   jackknife). The corrected percentiles form the 95 % CI.
+- *Percentile* (simplest): take the raw 2.5th and 97.5th percentiles.
+  Implicitly assumes the bootstrap distribution is unbiased and symmetric.
+- *BCa* — bias-corrected and accelerated (Efron 1987), used here via
+  `scipy.stats.bootstrap(..., method="BCa")`. Shifts the percentiles to
+  correct for two distortions: **bias** (the bootstrap distribution may be
+  off-centre relative to the true sampling distribution; estimated from the
+  fraction of resamples below the observed mean) and **acceleration** (the
+  standard error may itself vary with the underlying value, i.e. skew;
+  estimated via jackknife).
+
+When the distribution is symmetric and unbiased, both methods give the
+same interval. When it is skewed, BCa shifts the CI to be more honest about
+where the true sampling distribution lies. For bounded accuracies near
+0.5–0.8 the BCa corrections are small but non-zero; BCa is the
+textbook-recommended default and costs nothing extra at this sample size.
 
 **Intuitively.** *"If I were to repeat this entire study with a different
 set of 123 subjects drawn from the same population, where would the mean
@@ -182,14 +186,17 @@ computed from the Wilcoxon rank sums. Conventional cut-offs: `0.1` small,
 **t-based CI** (parametric). Assumes the paired differences are
 approximately normal. Formula in §0.6.
 
-**Percentile bootstrap CI** (non-parametric). Resample the 123 paired
-differences with replacement 10,000 times, compute the mean each
-time, take the 2.5th / 97.5th percentiles. No distributional assumption.
+**Percentile bootstrap CI** (non-parametric). Same resampling procedure
+as in §0.4, but applied to the paired-difference vector `d` rather than
+to the raw accuracy vector — and taking the raw 2.5th / 97.5th percentiles
+without the BCa correction. No distributional assumption.
 
 **Reading the table.** When the two CIs agree to within rounding, the
 t-distribution is a good fit and either interval is fine to quote in
 the report. When they disagree, prefer the bootstrap interval — it is
-assumption-free.
+assumption-free. (BCa would be the more rigorous choice for the paired-
+difference distribution too; we report the plain percentile interval for
+now and treat the gap as a known minor methodological inconsistency.)
 
 ### 0.11 Holm-Bonferroni correction (multiple comparisons)
 
