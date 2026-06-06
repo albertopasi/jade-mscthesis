@@ -1,15 +1,4 @@
 #!/bin/bash
-# JADE-FullFT 10-fold CV @ B=256 on FACED.
-#
-# For each task we fix α at its optimum (from B=128 sweep) and test τ
-# sensitivity around it at two LRs.
-#
-# Binary:  α=0.2, τ ∈ {0.05, 0.1}    — B=128 optimum was (0.2, 0.05)
-# 9-class: α=0.3, τ ∈ {0.1,  0.2}    — B=128 optimum was (0.3, 0.1)
-# LRs:     4e-4 (safe), 8e-4 (aggressive)
-#
-# Grid: 2 tasks × 2 τ × 2 LR = 8 jobs × 10 folds.
-# Walltime: 10h/job (~45min × 10 folds + margin).
 #
 # Usage: bash slurm/run_jade_b256_10fold.sh
 
@@ -31,23 +20,11 @@ submit() {
     echo "  $name  $JOB"
 }
 
-echo "=== JADE B=256 10-fold CV (FACED, 8 jobs) ==="
+echo "=== JADE B=256 10-fold CV (FACED, 1 job) ==="
 echo ""
 
-echo "Binary (α=0.2):"
-for TAU in 0.05 0.1; do
-    for LR in 4e-4 8e-4; do
-        submit binary 0.2 $TAU $LR
-    done
-done
+echo "9-class (α=0.3, τ=0.1, lr=4e-4):"
+submit 9-class 0.3 0.1 4e-4
 
 echo ""
-echo "9-class (α=0.3):"
-for TAU in 0.1 0.2; do
-    for LR in 4e-4 8e-4; do
-        submit 9-class 0.3 $TAU $LR
-    done
-done
-
-echo ""
-echo "All 8 jobs submitted. Monitor: squeue -u \$USER"
+echo "1 job submitted. Monitor: squeue -u \$USER"

@@ -1,0 +1,221 @@
+{
+  "dataset": "faced",
+  "task_mode": "binary",
+  "completed_at": "2026-06-04T23:13:39.163136",
+  "n_seeds": 2,
+  "seeds": [
+    123,
+    789
+  ],
+  "mean": {
+    "val_acc": 0.5885,
+    "val_bal_acc": 0.5885,
+    "val_f1": 0.5746
+  },
+  "std": {
+    "val_acc": 0.0185,
+    "val_bal_acc": 0.0185,
+    "val_f1": 0.0156
+  },
+  "per_seed": [
+    {
+      "seed": 123,
+      "mean_acc": 0.6015,
+      "mean_bal_acc": 0.6015,
+      "mean_auroc": 0.6201,
+      "mean_f1": 0.5857,
+      "folds": [
+        {
+          "val_acc": 0.625,
+          "val_bal_acc": 0.625,
+          "val_auroc": 0.6364850427350428,
+          "val_f1": 0.6202207680063255,
+          "best_epoch": 15,
+          "epochs_trained": 26,
+          "fold": 1
+        },
+        {
+          "val_acc": 0.5769230769230769,
+          "val_bal_acc": 0.5769230769230769,
+          "val_auroc": 0.5717455621301775,
+          "val_f1": 0.574404761904762,
+          "best_epoch": 11,
+          "epochs_trained": 22,
+          "fold": 2
+        },
+        {
+          "val_acc": 0.5737179487179487,
+          "val_bal_acc": 0.5737179487179487,
+          "val_auroc": 0.6185075608152532,
+          "val_f1": 0.5066988433053174,
+          "best_epoch": 4,
+          "epochs_trained": 15,
+          "fold": 3
+        },
+        {
+          "val_acc": 0.59375,
+          "val_bal_acc": 0.59375,
+          "val_auroc": 0.6298466435185185,
+          "val_f1": 0.5783731027665512,
+          "best_epoch": 7,
+          "epochs_trained": 18,
+          "fold": 4
+        },
+        {
+          "val_acc": 0.5520833333333334,
+          "val_bal_acc": 0.5520833333333333,
+          "val_auroc": 0.546778549382716,
+          "val_f1": 0.5468328799873144,
+          "best_epoch": 8,
+          "epochs_trained": 19,
+          "fold": 5
+        },
+        {
+          "val_acc": 0.5833333333333334,
+          "val_bal_acc": 0.5833333333333333,
+          "val_auroc": 0.5465856481481481,
+          "val_f1": 0.5808877031287898,
+          "best_epoch": 23,
+          "epochs_trained": 34,
+          "fold": 6
+        },
+        {
+          "val_acc": 0.6215277777777778,
+          "val_bal_acc": 0.6215277777777778,
+          "val_auroc": 0.6683304398148148,
+          "val_f1": 0.5708133382551988,
+          "best_epoch": 6,
+          "epochs_trained": 17,
+          "fold": 7
+        },
+        {
+          "val_acc": 0.6319444444444444,
+          "val_bal_acc": 0.6319444444444444,
+          "val_auroc": 0.6787229938271605,
+          "val_f1": 0.6239467849223946,
+          "best_epoch": 12,
+          "epochs_trained": 23,
+          "fold": 8
+        },
+        {
+          "val_acc": 0.6423611111111112,
+          "val_bal_acc": 0.6423611111111112,
+          "val_auroc": 0.6572627314814814,
+          "val_f1": 0.641110640614603,
+          "best_epoch": 10,
+          "epochs_trained": 21,
+          "fold": 9
+        },
+        {
+          "val_acc": 0.6145833333333334,
+          "val_bal_acc": 0.6145833333333333,
+          "val_auroc": 0.6465084876543209,
+          "val_f1": 0.6140202600726852,
+          "best_epoch": 8,
+          "epochs_trained": 19,
+          "fold": 10
+        }
+      ]
+    },
+    {
+      "seed": 789,
+      "mean_acc": 0.5754,
+      "mean_bal_acc": 0.5754,
+      "mean_auroc": 0.5784,
+      "mean_f1": 0.5636,
+      "folds": [
+        {
+          "val_acc": 0.5865384615384616,
+          "val_bal_acc": 0.5865384615384616,
+          "val_auroc": 0.6120973044049967,
+          "val_f1": 0.5834187238006521,
+          "best_epoch": 14,
+          "epochs_trained": 25,
+          "fold": 1
+        },
+        {
+          "val_acc": 0.5769230769230769,
+          "val_bal_acc": 0.5769230769230769,
+          "val_auroc": 0.5550830046022354,
+          "val_f1": 0.5764880095430053,
+          "best_epoch": 18,
+          "epochs_trained": 29,
+          "fold": 2
+        },
+        {
+          "val_acc": 0.5352564102564102,
+          "val_bal_acc": 0.5352564102564102,
+          "val_auroc": 0.5446457922419461,
+          "val_f1": 0.5352516359676608,
+          "best_epoch": 1,
+          "epochs_trained": 12,
+          "fold": 3
+        },
+        {
+          "val_acc": 0.5833333333333334,
+          "val_bal_acc": 0.5833333333333333,
+          "val_auroc": 0.5670090663580247,
+          "val_f1": 0.5831524099001304,
+          "best_epoch": 13,
+          "epochs_trained": 24,
+          "fold": 4
+        },
+        {
+          "val_acc": 0.53125,
+          "val_bal_acc": 0.53125,
+          "val_auroc": 0.537085262345679,
+          "val_f1": 0.49906590220962443,
+          "best_epoch": 8,
+          "epochs_trained": 19,
+          "fold": 5
+        },
+        {
+          "val_acc": 0.5729166666666666,
+          "val_bal_acc": 0.5729166666666666,
+          "val_auroc": 0.5475260416666667,
+          "val_f1": 0.5729115175481958,
+          "best_epoch": 13,
+          "epochs_trained": 24,
+          "fold": 6
+        },
+        {
+          "val_acc": 0.59375,
+          "val_bal_acc": 0.59375,
+          "val_auroc": 0.5830922067901234,
+          "val_f1": 0.5933528836754643,
+          "best_epoch": 20,
+          "epochs_trained": 31,
+          "fold": 7
+        },
+        {
+          "val_acc": 0.5868055555555556,
+          "val_bal_acc": 0.5868055555555556,
+          "val_auroc": 0.5980902777777778,
+          "val_f1": 0.5723217071192362,
+          "best_epoch": 15,
+          "epochs_trained": 26,
+          "fold": 8
+        },
+        {
+          "val_acc": 0.59375,
+          "val_bal_acc": 0.59375,
+          "val_auroc": 0.6186824845679012,
+          "val_f1": 0.5759535884625548,
+          "best_epoch": 14,
+          "epochs_trained": 25,
+          "fold": 9
+        },
+        {
+          "val_acc": 0.59375,
+          "val_bal_acc": 0.59375,
+          "val_auroc": 0.6209490740740741,
+          "val_f1": 0.5441496773495312,
+          "best_epoch": 4,
+          "epochs_trained": 15,
+          "fold": 10
+        }
+      ]
+    }
+  ],
+  "mode": "official"
+}
