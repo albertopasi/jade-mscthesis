@@ -790,7 +790,7 @@ def main() -> None:
             for r in fold_results
         ]
 
-        if len(fold_results) > 1:
+        if fold_results:
             print_fold_summary(cfg, serializable_results, gen_seed=gen_seed)
 
         # Generalization mode: emit a subject-wise summary JSON+NPZ for this

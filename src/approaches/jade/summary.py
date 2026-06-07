@@ -17,10 +17,13 @@ from src.approaches.shared.summary import (
 
 def _fold_filename(cfg: JADEConfig, gen_seed: int | None) -> str:
     gen_tag = f"_gen_s{gen_seed}" if gen_seed is not None else ""
+    # Single-fold runs get a _fold{N} suffix so a fold screen never collides
+    # with (overwrites or is overwritten by) the eventual full-CV aggregate.
+    fold_tag = f"_fold{cfg.fold}" if cfg.fold is not None else ""
     return (
         f"summary_{cfg.dataset}_{cfg.task_mode}_{cfg.window_tag}_"
         f"{cfg.pool_tag}_r{cfg.lora_rank}_{cfg._supcon_tag}_{cfg._optim_tag}"
-        f"{cfg.mixup_tag}{cfg._mode_tags}{gen_tag}"
+        f"{cfg.mixup_tag}{cfg._mode_tags}{gen_tag}{fold_tag}"
     )
 
 
