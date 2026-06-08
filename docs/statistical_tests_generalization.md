@@ -120,24 +120,48 @@ Variance ratio < 1 ⇒ method `a` has tighter subject-level spread than method `
 
 ## Task: binary
 
-Methods available: **SFT, JADE** (N = 123 subjects).
-
-Missing: **LP** — re-run this script once the corresponding `_gen_avg.json` is available.
+Methods available: **LP, SFT, JADE** (N = 123 subjects).
 
 ### Per-condition BCa CI on the mean accuracy
 
 | Method | N | Mean | Std | 95 % CI on the mean (BCa) |
 |--------|---|------|-----|---------------------------|
-| SFT    | 123 |  59.33 %  |  9.30 %    | 57.71 % – 61.04 %         |
-| JADE   | 123 |  59.55 %  |  7.79 %    | 58.13 % – 60.89 %         |
+| LP     | 123 |  58.82 %  |  9.41 %    | 57.18 % – 60.47 %         |
+| SFT    | 123 |  59.33 %  |  9.30 %    | 57.72 % – 61.01 %         |
+| JADE   | 123 |  59.55 %  |  7.79 %    | 58.18 % – 60.91 %         |
 
-### Pairwise Wilcoxon (k = 2 fallback)
+### Friedman omnibus test
 
-Only two methods available — Friedman not applicable. The pairwise Wilcoxon below is the primary test.
+- χ²(2) = **1.208**, p = **0.547** (Holm across tasks, n=2: p = 1.000)
+- Kendall's W = **0.0049** (effect size in [0, 1])
+- Mean ranks (higher rank = better method on a given subject):
+    - LP: 1.923
+    - SFT: 2.045
+    - JADE: 2.033
 
-| Comparison | Mean Δ (pp) | Cohen's d | Wins / Losses / Ties | Wilcoxon W | p (Wilcoxon) | Holm p (W) | t | p (t-test) | Holm p (t) |
-|------------|-------------|-----------|----------------------|------------|--------------|------------|---|------------|------------|
-| SFT vs JADE | -0.22 | -0.034 | 55 / 56 / 12 | 3040 | 0.840 | 0.840 | -0.37 | 0.709 | 0.709 |
+**Fail to reject H₀**: no significant difference among the three methods.
+
+### Per-seed Friedman (robustness check)
+
+| Seed | χ² | df | p (raw) | Kendall's W | Verdict |
+|------|-----|----|---------|-------------|---------|
+| 123 | 0.455 | 2 | 0.797 | 0.0018 | fail to reject |
+| 789 | 1.840 | 2 | 0.399 | 0.0075 | fail to reject |
+
+### Pairwise post-hoc
+
+Omnibus not significant (Friedman p ≥ 0.05) — **post-hoc tests not run** to avoid uncontrolled multiple-comparison fishing.
+
+### Dispersion omnibus (Brown-Forsythe via Friedman)
+
+- χ²(2) = **4.234**, p = **0.120**
+- Kendall's W = **0.0172**
+- Mean ranks of |a − median(a)| per method:
+    - LP: 2.053
+    - SFT: 2.093
+    - JADE: 1.854
+
+**Fail to reject H₀**: no significant difference in dispersion.
 
 ### Pairwise variance ratios (BCa CIs)
 
@@ -145,5 +169,7 @@ Variance ratio < 1 ⇒ method `a` has tighter subject-level spread than method `
 
 | Comparison (a vs b) | Var(a) | Var(b) | Ratio Var(a)/Var(b) | 95 % BCa CI | approx p | Holm p |
 |----------------------|--------|--------|---------------------|-------------|----------|--------|
-| SFT vs JADE | 0.00865 | 0.00607 | **1.425** | [1.114, 1.805] | 0.016 | 0.016 |
+| LP vs SFT | 0.00886 | 0.00865 | **1.024** | [0.772, 1.323] | 0.862 | 0.862 |
+| LP vs JADE | 0.00886 | 0.00607 | **1.460** | [1.095, 1.867] | 0.020 | 0.050 |
+| SFT vs JADE | 0.00865 | 0.00607 | **1.425** | [1.115, 1.812] | 0.017 | 0.050 |
 
