@@ -191,7 +191,11 @@ def fetch_electrode_positions(electrode_names: list[str], reve_positions: dict) 
 
 
 def visualize_electrodes_3d_views(
-    electrode_names: list[str], positions_dict: dict, dataset_label: str
+    electrode_names: list[str],
+    positions_dict: dict,
+    dataset_label: str,
+    out_dir: Path | None = None,
+    slug: str = "electrodes",
 ) -> None:
     """
     Create 3D and 2D visualizations of electrode positions.
@@ -237,12 +241,25 @@ def visualize_electrodes_3d_views(
         show_names=True,
     )
 
-    print("\n✓ Visualizations ready. Close figures to continue.")
-    plt.show()
+    if out_dir is not None:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        fig_3d.savefig(out_dir / f"{slug}_3d.pdf", bbox_inches="tight")
+        fig_2d.savefig(out_dir / f"{slug}_topomap.pdf", bbox_inches="tight")
+        print(f"\n✓ Saved → {out_dir / f'{slug}_3d.pdf'}")
+        print(f"✓ Saved → {out_dir / f'{slug}_topomap.pdf'}")
+        plt.close(fig_3d)
+        plt.close(fig_2d)
+    else:
+        print("\n✓ Visualizations ready. Close figures to continue.")
+        plt.show()
 
 
 def visualize_custom_3d(
-    electrode_names: list[str], positions_dict: dict, dataset_label: str
+    electrode_names: list[str],
+    positions_dict: dict,
+    dataset_label: str,
+    out_dir: Path | None = None,
+    slug: str = "electrodes",
 ) -> None:
     """
     Create custom 3D visualization with multiple viewpoints.
@@ -303,7 +320,13 @@ def visualize_custom_3d(
         ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.show()
+    if out_dir is not None:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_dir / f"{slug}_3d_views.pdf", bbox_inches="tight")
+        print(f"✓ Saved → {out_dir / f'{slug}_3d_views.pdf'}")
+        plt.close(fig)
+    else:
+        plt.show()
 
 
 def main() -> None:
@@ -325,6 +348,13 @@ def main() -> None:
         "--mne-only",
         action="store_true",
         help="Use only MNE visualization (default: shows both MNE + custom multi-view).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="Directory to save figures as PDFs (headless mode for SSH). "
+        "Default: open interactive matplotlib windows.",
     )
     args = parser.parse_args()
 
@@ -362,10 +392,22 @@ def main() -> None:
 
         # Visualize
         print("\n" + "=" * 70)
-        visualize_electrodes_3d_views(electrode_names, positions_dict, dataset_label)
+        visualize_electrodes_3d_views(
+            electrode_names,
+            positions_dict,
+            dataset_label,
+            out_dir=args.out_dir,
+            slug=dataset,
+        )
 
         if not args.mne_only:
-            visualize_custom_3d(electrode_names, positions_dict, dataset_label)
+            visualize_custom_3d(
+                electrode_names,
+                positions_dict,
+                dataset_label,
+                out_dir=args.out_dir,
+                slug=dataset,
+            )
 
         print("\n✓ Visualization complete!")
 
