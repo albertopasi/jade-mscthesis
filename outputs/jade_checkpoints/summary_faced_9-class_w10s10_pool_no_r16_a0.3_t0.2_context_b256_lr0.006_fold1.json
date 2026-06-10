@@ -1,0 +1,41 @@
+{
+  "dataset": "faced",
+  "task_mode": "9-class",
+  "completed_at": "2026-06-09T22:38:02.287372",
+  "n_folds_run": 1,
+  "mean": {
+    "train_loss": 3.9698,
+    "val_acc": 0.5192,
+    "val_bal_acc": 0.5195,
+    "val_auroc": 0.8597,
+    "val_f1": 0.5089
+  },
+  "std": {
+    "train_loss": 0.0,
+    "val_acc": 0.0,
+    "val_bal_acc": 0.0,
+    "val_auroc": 0.0,
+    "val_f1": 0.0
+  },
+  "folds": [
+    {
+      "fold": 1,
+      "train_loss": 3.9697862573572107,
+      "val_loss": 3.380337432190612,
+      "val_acc": 0.5192307692307693,
+      "val_bal_acc": 0.5194681861348528,
+      "val_auroc": 0.859669412180096,
+      "val_f1": 0.5088592387501055,
+      "best_epoch": 1,
+      "lp_epochs_trained": 20,
+      "ft_epochs_trained": 21,
+      "lp_train_loss": 1.4747675963350244,
+      "lp_val_acc": 0.49725274725274726
+    }
+  ],
+  "approach": "jade_lora",
+  "lora_rank": 16,
+  "supcon_alpha": 0.3,
+  "supcon_temperature": 0.2,
+  "supcon_repr": "context"
+}
