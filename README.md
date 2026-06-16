@@ -1,29 +1,50 @@
-# 🧠 JADE: Cross-Subject Generalization in EEG Emotion Recognition
+<div align="center">
+  <h1>🧠 JADE: Joint Alignment & Discriminative Embedding</h1>
+  <p><i>A new SOTA for cross-subject EEG emotion recognition — fine-tuning a pretrained EEG foundation model with a supervised contrastive objective to generalize to unseen people with zero calibration.</i></p>
 
-*Master Thesis in Computer Science, [TU Delft](https://www.tudelft.nl/en/), conducted at [Zander Labs](https://zanderlabs.com/).*
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.12+-blue.svg" alt="Python 3.12+" />
+    <img src="https://img.shields.io/badge/PyTorch-EE4C2C.svg?logo=pytorch&logoColor=white" alt="PyTorch" />
+    <img src="https://img.shields.io/badge/Lightning-792EE5.svg?logo=lightning&logoColor=white" alt="PyTorch Lightning" />
+    <img src="https://img.shields.io/badge/PEFT-LoRA-FFD21E.svg?logo=huggingface&logoColor=black" alt="HuggingFace PEFT / LoRA" />
+    <img src="https://img.shields.io/badge/scikit--learn-F7931E.svg?logo=scikit-learn&logoColor=white" alt="scikit-learn" />
+    <img src="https://img.shields.io/badge/Weights_&_Biases-FFBE00.svg?logo=weightsandbiases&logoColor=black" alt="Weights & Biases" />
+    <img src="https://img.shields.io/badge/EEG_Foundation_Model-REVE-6E44FF.svg" alt="REVE" />
+  </p>
 
-Welcome to the **JADE** MSc Thesis Project! 🚀
-
-This repository tackles **cross-subject generalization** for EEG emotion recognition. The core idea: take a large pretrained EEG foundation model ([REVE](https://brain-bzh.github.io/reve/)) and fine-tune it with a **Supervised Contrastive (SupCon)** objective that explicitly pulls representations of the same emotion together *across different subjects* — so the model works on a brand-new person with no calibration.
-
-Two questions drive the work:
-
-- **RQ1.** Are frozen embeddings from a large pretrained EEG foundation model already sufficient to overcome inter-subject variability — i.e. can REVE serve as a zero-calibration baseline?
-- **RQ2.** Does fine-tuning REVE with a supervised contrastive objective (JADE) push generalization further than standard fine-tuning and beyond existing cross-subject contrastive frameworks?
-
----
-
-## 🎯 Project Scope
-
-Three training strategies are implemented and compared under strict 10-fold cross-subject CV on FACED (123 subjects, 28 video stimuli, 9 emotion categories):
-
-1. **Linear Probing (LP).** REVE frozen, single linear classifier on top. Establishes the lower bound from frozen foundation-model embeddings (answers RQ1).
-2. **Supervised Fine-Tuning (SFT).** Two-stage: LP warmup, then full encoder fine-tune with cross-entropy. Baseline for the contribution of explicit alignment.
-3. **Joint Alignment and Discriminative Embedding (JADE).** *The proposed method.* Same staged schedule as SFT, but Stage 2 adds a parallel projection head and a SupCon term to the loss: `L = λ · L_CE + (1 − λ) · L_SupCon`. Answers RQ2.
+</div>
 
 ---
 
-## 📊 Results
+## 🚀 Overview
+
+*Master Thesis in Computer Science at [TU Delft](https://www.tudelft.nl/en/), conducted at [Zander Labs](https://zanderlabs.com/).*
+
+Decoding human emotions from EEG data is notoriously difficult because every brain is unique. Traditional models often fail when tested on new individuals without requiring extensive, time-consuming recalibration. 
+
+**JADE** (Joint Alignment & Discriminative Embedding) is built to solve this **cross-subject generalization** bottleneck: we take [REVE](https://brain-bzh.github.io/reve/), a massive pretrained EEG foundation model, and fine-tune it using a **Supervised Contrastive (SupCon)** objective. By explicitly forcing the model to group similar emotional states together, regardless of whose brain generated them, JADE achieves zero-calibration generalization on completely unseen subjects.*
+
+---
+
+## 🔬 The Research Questions
+
+This work systematically breaks down the generalization problem by answering two pivotal questions:
+
+*   **RQ1: The Foundation Baseline:** Are the frozen embeddings from a large pretrained EEG foundation model naturally robust enough to overcome inter-subject variability on their own?
+*   **RQ2: The SupCon Advantage:** Does fine-tuning that foundation model with a supervised contrastive objective (JADE) push generalization boundaries further than standard fine-tuning and state-of-the-art cross-subject frameworks?
+
+---
+
+## 🎯 Methodology & Scope
+
+To rigorously test our hypotheses, we implemented and compared three training strategies under strict **10-fold cross-subject cross-validation** on the FACED dataset (123 subjects, 28 video stimuli, 9 emotion categories):
+
+1.  **Linear Probing (LP):** Leaves the REVE foundation model completely frozen and trains a single linear classifier on top. This establishes the absolute lower bound of what frozen embeddings can achieve (Answers RQ1).
+2.  **Supervised Fine-Tuning (SFT):** A two-stage baseline. It starts with an LP warmup, followed by a full encoder fine-tune using standard cross-entropy. This isolates the specific contribution of our alignment strategy.
+3.  **JADE (Proposed Method):** Follows the same staged schedule as SFT, but injects a parallel projection head and a Supervised Contrastive term into the loss function during Stage 2. This explicitly aligns the representations across subjects (Answers RQ2).
+---
+
+## 📊 Results Summary
 
 Cross-subject classification accuracy on FACED, 10-fold cross-subject protocol (best per task in **bold**):
 
