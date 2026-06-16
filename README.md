@@ -22,7 +22,7 @@
 
 Decoding human emotions from EEG data is notoriously difficult because every brain is unique. Traditional models often fail when tested on new individuals without requiring extensive, time-consuming recalibration. 
 
-**JADE** (Joint Alignment & Discriminative Embedding) is built to solve this **cross-subject generalization** bottleneck: we take [REVE](https://brain-bzh.github.io/reve/), a massive pretrained EEG foundation model, and fine-tune it using a **Supervised Contrastive (SupCon)** objective. By explicitly forcing the model to group similar emotional states together, regardless of whose brain generated them, JADE achieves zero-calibration generalization on completely unseen subjects.*
+**JADE** (Joint Alignment & Discriminative Embedding) is built to solve this **cross-subject generalization** bottleneck: we take [REVE](https://brain-bzh.github.io/reve/), a massive pretrained EEG foundation model, and fine-tune it using a **Supervised Contrastive (SupCon)** objective. By explicitly forcing the model to group similar emotional states together, regardless of whose brain generated them, JADE achieves zero-calibration generalization on completely unseen subjects.
 
 ---
 
