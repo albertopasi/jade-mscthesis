@@ -82,17 +82,34 @@ On **9-class, accuracy collapses to almost chance** (~16 % vs 11 %), all three m
 
 This is the main limitation of the work and motivates a larger, clip-diverse benchmark.
 
-### Subject-wise behaviour
+### Subject-wise & Per-Class behaviour
+JADE outperforms SFT on 88/123 subjects on 9-class (mean Δ = +3.51 pp, broad-based across the cohort) and on 61/123 subjects on binary (mean Δ = +0.80 pp, essentially interchangeable). 
 
-JADE outperforms SFT on 88/123 subjects on 9-class (mean Δ = +3.51 pp, broad-based across the cohort) and on 61/123 subjects on binary (mean Δ = +0.80 pp, essentially interchangeable). See the auto-generated paired scatter plots and confusion matrices in [`src/visualization/jade_9-class/figures/`](src/visualization/jade_9-class/figures/) and [`src/visualization/jade_binary/figures/`](src/visualization/jade_binary/figures/).
+#### JADE vs SFT: Paired Subject Scatter (Left: 9-Class, Right: Binary)
+<p align="center">
+  <img src="docs/img-readme/pairedsubj9class.png" width="35%" alt="9-Class Paired Subject Scatter">
+  &nbsp; &nbsp; &nbsp;
+  <img src="docs/img-readme/pairedsubjbinary.png" width="35%" alt="Binary Paired Subject Scatter">
+</p>
 
-Headline figures:
+#### Per-subject accuracy under JADE (Left: 9-Class, Right: Binary)
+<p align="center">
+  <img src="docs/img-readme/subhistogram9class.png" width="45%" alt="9-Class Subject Histogram">
+  &nbsp; &nbsp; &nbsp;
+  <img src="docs/img-readme/subhistogrambinary.png" width="45%" alt="Binary Subject Histogram">
+</p>
 
-- Paired per-subject scatter (JADE vs SFT): [`src/visualization/jade_9-class/figures/paired_subject_scatter.pdf`](src/visualization/jade_9-class/figures/paired_subject_scatter.pdf)
-- Per-class F1 bars: [`src/visualization/jade_9-class/figures/per_class_f1_bars_with_lp.pdf`](src/visualization/jade_9-class/figures/per_class_f1_bars_with_lp.pdf)
-- Confusion matrices: [`src/visualization/jade_9-class/figures/confusion_matrix.pdf`](src/visualization/jade_9-class/figures/confusion_matrix.pdf), [`src/visualization/jade_binary/figures/confusion_matrix.pdf`](src/visualization/jade_binary/figures/confusion_matrix.pdf)
+#### Per-Class F1 Scores (9-Class Only)
+<p align="center">
+  <img src="docs/img-readme/f1bars9class.png" width="550" alt="Per-class F1 bars">
+</p>
 
-Full paired significance tests (Wilcoxon + BCa + Holm) and per-class breakdowns: [`docs/results_brief.md`](docs/results_brief.md) and [`docs/statistical_tests.md`](docs/statistical_tests.md).
+#### Confusion Matrix (9-Class Only)
+<p align="center">
+  <img src="docs/img-readme/conf9class.png" width="450" alt="9-Class Confusion Matrix">
+</p>
+
+Full paired significance tests (Wilcoxon + BCa + Holm) and per-class breakdowns can be found in [`docs/results_brief.md`](docs/results_brief.md) and [`docs/statistical_tests.md`](docs/statistical_tests.md).
 
 ---
 
